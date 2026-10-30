@@ -1,0 +1,17 @@
+4.5 (Compatibility Profile) Mesa 25.2.8-0ubuntu0.24.04.2
+PASS causticsFrag
+PASS causticsVert
+PASS deckFrag
+PASS dropFrag
+PASS fullscreenVert
+PASS normalFrag
+PASS poolFrag
+PASS poolVert
+PASS updateFrag
+PASS waterFrag
+PASS waterVert
+PASS reliefVert
+PASS reliefFrag
+PASS silhouetteVert
+PASS silhouetteFrag
+PASS blurFrag
