@@ -55,13 +55,13 @@ try {
     await page.waitForTimeout(900);
     await page.screenshot({path:`test-results/about-${viewport.width}.png`,fullPage:true});
     assert(await page.locator('text=YBBE TECH').count());
-    assert.equal(await page.locator('img[src*="group"]').count(),0);
+    assert.equal(await page.locator('img[src*="group"]').count(),2, 'Preserve the approved running and hiking photographs');
     assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
     await page.goto(`${origin}/work/adapt-to-china/`,{waitUntil:'networkidle'});
     assert.equal(await page.locator('[data-testimonial][data-consent="true"]').count(),2);
     for(const slug of slugs) {
       await page.goto(`${origin}/work/${slug}/`,{waitUntil:'domcontentloaded'});
-      assert(await page.locator('h2').filter({hasText:'Status & limits'}).count());
+      assert.equal(await page.locator('strong').filter({hasText:/^Status & limits\.?$/}).count(),1, `Expected one status/limits section: ${slug}`);
     }
     assert.deepEqual(failures,[],`Browser/shader errors at ${viewport.width}px`);
     results.push({viewport,mode,labels:'pass',routes:'pass'});
@@ -89,9 +89,12 @@ try {
   await reduced.close();
   const nojs=await browser.newContext({javaScriptEnabled:false,viewport:{width:390,height:844}});
   const staticPage=await nojs.newPage(); await staticPage.goto(origin); await checkLabels(staticPage);
-  assert.equal(await staticPage.locator('.pool__objects a').count(),6); await nojs.close();
+  assert.equal(await staticPage.locator('.pool__objects a').count(),slugs.length);
+  for (const slug of slugs) assert.equal(await staticPage.locator(`.pool__objects a[href="/work/${slug}/"]`).count(),1, `No-JS pool link missing: ${slug}`);
+  await nojs.close();
   const page=await browser.newPage(); await page.goto(`${origin}/?pool=static`); await page.waitForSelector('.pool--unsupported');
-  await page.locator('.pool__objects a[href="/work/meetfolio/"]').click(); await page.waitForURL('**/work/meetfolio/');
+  await page.locator('.pool__list-link').click();
+  await page.locator('.home-work a[href="/work/meetfolio/"]').click(); await page.waitForURL('**/work/meetfolio/');
   await page.goto(`${origin}/work/`); await page.locator('[data-filter="client"]').click();
   assert.equal(await page.locator('[data-filter-list] > li:visible').count(),2);
   const response=await page.goto(`${origin}/does-not-exist/`); assert.equal(response.status(),404);
