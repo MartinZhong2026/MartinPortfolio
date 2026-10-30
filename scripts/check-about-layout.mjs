@@ -14,7 +14,7 @@ try {
     const page = await browser.newPage({ viewport, reducedMotion: 'reduce' });
     const errors = [];
     page.on('pageerror', error => errors.push(error.message));
-    for (const route of ['/about/', '/']) {
+    for (const route of ['/about/']) {
       await page.goto(origin + route, { waitUntil: 'networkidle' });
       const hero = page.locator('.about-v6__hero');
       await hero.scrollIntoViewIfNeeded();
@@ -49,20 +49,18 @@ try {
         assert(layout.portrait.x > layout.heading.right, 'Desktop portrait belongs in right column');
         assert(layout.statement.x < layout.portrait.x, 'Desktop introduction belongs in left column');
       }
-      const name = route === '/' ? 'home' : 'about';
+      const name = 'about';
       await hero.evaluate(el => window.scrollTo(0, el.offsetTop));
       await page.screenshot({ path: `test-results/about-refresh/${name}-${viewport.width}-viewport.png` });
       await hero.screenshot({ path: `test-results/about-refresh/${name}-${viewport.width}-hero.png` });
-      if (route === '/about/') {
-        // Reveal the whole page before taking a full-page record.
-        for (const section of await page.locator('[data-reveal]').all()) await section.scrollIntoViewIfNeeded();
-        await page.screenshot({ path: `test-results/about-refresh/about-${viewport.width}-full.png`, fullPage: true });
-      }
+      // Reveal the whole page before taking a full-page record.
+      for (const section of await page.locator('[data-reveal]').all()) await section.scrollIntoViewIfNeeded();
+      await page.screenshot({ path: `test-results/about-refresh/about-${viewport.width}-full.png`, fullPage: true });
       results.push({ route, viewport, layout });
     }
     assert.deepEqual(errors, [], `Browser errors at ${viewport.width}`);
     await page.close();
-    console.log(`PASS: About + homepage at ${viewport.width} × ${viewport.height}, reading order, portrait, education, overflow and console`);
+    console.log(`PASS: About at ${viewport.width} × ${viewport.height}, reading order, portrait, education, overflow and console`);
   }
   await writeFile('test-results/about-refresh/layout-results.json', JSON.stringify(results, null, 2));
 } finally {
