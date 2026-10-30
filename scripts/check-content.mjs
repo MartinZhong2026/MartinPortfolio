@@ -21,7 +21,7 @@ assert.match(home, /Adapt to China/);
 for (const href of ['/about/', '/work/', '/life/']) assert(home.includes(`href="${href}"`), `Homepage is missing a link to ${href}`);
 // The homepage stays the pool: its old stacked sections live on their own pages.
 for (const text of ['YBBE TECH', 'First Prize Scholarship', 'about-v6__gallery', 'card__summary']) assert(!home.includes(text), `Homepage should not contain: ${text}`);
-for (const [font, license] of [['piedra.woff2', 'Piedra-OFL.txt'], ['cherry-cream-soda.woff2', 'CherryCreamSoda-Apache-2.0.txt'], ['geo.woff2', 'Geo-OFL.txt']]) {
+for (const [font, license] of [['piedra.woff2', 'Piedra-OFL.txt'], ['cherry-cream-soda.woff2', 'CherryCreamSoda-Apache-2.0.txt'], ['geo.woff2', 'Geo-OFL.txt'], ['special-elite.woff2', 'SpecialElite-Apache-2.0.txt']]) {
   await stat(join(dist, 'fonts', font));
   await stat(join(dist, 'fonts/licenses', license));
 }

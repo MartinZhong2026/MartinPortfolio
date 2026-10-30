@@ -18,26 +18,34 @@ export interface Slot {
 }
 
 export const landscapeLayout: Record<PoolObjectId, Slot> = {
-  meetfolio: { sx: -0.42, sy: -0.68, yaw: -0.2, size: 1.0 },
-  abtrace: { sx: 0.42, sy: -0.7, yaw: 0.16, size: 1.0 },
-  fanscope: { sx: 0.84, sy: 0.02, yaw: 0.14, size: 1.0 },
-  'adapt-to-china': { sx: 0.5, sy: 0.66, yaw: -0.1, size: 1.0 },
-  'supplier-document-intelligence': { sx: -0.4, sy: 0.7, yaw: -0.14, size: 1.0 },
-  about: { sx: -0.84, sy: -0.04, yaw: -0.3, size: 1.0 },
-  life: { sx: -0.86, sy: 0.72, yaw: 0, size: 1.0 },
+  meetfolio: { sx: -0.46, sy: -0.56, yaw: -0.2, size: 1.0 },
+  abtrace: { sx: 0.44, sy: -0.58, yaw: 0.16, size: 1.0 },
+  fanscope: { sx: 0.89, sy: 0.04, yaw: 0.14, size: 1.0 },
+  'adapt-to-china': { sx: 0.6, sy: 0.74, yaw: -0.1, size: 1.0 },
+  'supplier-document-intelligence': { sx: -0.36, sy: 0.78, yaw: -0.14, size: 1.0 },
+  about: { sx: -0.87, sy: 0.14, yaw: -0.3, size: 1.0 },
+  life: { sx: -0.86, sy: 0.76, yaw: 0, size: 1.0 },
 };
 
-// Labels have their own collision avoidance. At small screens keep all seven
-// objects around a central open stripe for the underwater name.
+// At small screens keep all seven objects around a central open stripe for the
+// underwater name.
 export const portraitLayout: Record<PoolObjectId, Slot> = {
-  meetfolio: { sx: -0.5, sy: -0.7, yaw: -0.16, size: 0.98 },
-  abtrace: { sx: 0.48, sy: -0.72, yaw: 0.16, size: 0.98 },
-  fanscope: { sx: 0.56, sy: 0.3, yaw: 0.12, size: 0.98 },
-  'adapt-to-china': { sx: 0.4, sy: 0.74, yaw: 0.08, size: 0.92 },
-  'supplier-document-intelligence': { sx: -0.54, sy: 0.76, yaw: -0.1, size: 0.98 },
-  about: { sx: -0.6, sy: -0.27, yaw: 0.16, size: 0.98 },
-  life: { sx: -0.62, sy: 0.27, yaw: 0, size: 0.92 },
+  meetfolio: { sx: -0.5, sy: -0.68, yaw: -0.16, size: 1.12 },
+  abtrace: { sx: 0.48, sy: -0.7, yaw: 0.16, size: 1.12 },
+  fanscope: { sx: 0.56, sy: 0.32, yaw: 0.12, size: 1.12 },
+  'adapt-to-china': { sx: 0.4, sy: 0.76, yaw: 0.08, size: 1.0 },
+  'supplier-document-intelligence': { sx: -0.54, sy: 0.78, yaw: -0.1, size: 1.12 },
+  about: { sx: -0.6, sy: -0.3, yaw: 0.16, size: 1.05 },
+  life: { sx: -0.62, sy: 0.3, yaw: 0, size: 1.0 },
 };
+
+/** Decorative rubber ducks: no links, just company. They wander around these. */
+export const duckSlots: { landscape: Slot; portrait: Slot }[] = [
+  { landscape: { sx: -0.8, sy: -0.7, yaw: 0.9, size: 1 }, portrait: { sx: 0.02, sy: -0.86, yaw: 0.9, size: 1.15 } },
+  { landscape: { sx: 0.0, sy: -0.72, yaw: -0.5, size: 1 }, portrait: { sx: 0.8, sy: -0.14, yaw: -0.5, size: 1.15 } },
+  { landscape: { sx: 0.04, sy: 0.88, yaw: 2.5, size: 1 }, portrait: { sx: -0.02, sy: 0.5, yaw: 2.5, size: 1.15 } },
+  { landscape: { sx: 0.84, sy: -0.62, yaw: 1.8, size: 1 }, portrait: { sx: -0.04, sy: 0.9, yaw: 1.8, size: 1.15 } },
+];
 
 export const POOL = {
   /** half extents of the water opening (world units): x is the long axis */
@@ -46,5 +54,5 @@ export const POOL = {
   depth: 0.5,
   /** height of the deck above the resting water level */
   rimH: 0.075,
-  coping: 0.085,
+  coping: 0.17,
 } as const;

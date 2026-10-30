@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import {
+  blurFrag,
+  buildRippleMap,
   causticsFrag,
   causticsVert,
   deckFrag,
@@ -15,8 +17,8 @@ import {
   waterVert,
 } from './shaders';
 import { FloatShadows } from './FloatShadows';
-import { builders, disposeObjectResources, type BuiltObject } from './objects';
-import { landscapeLayout, POOL, portraitLayout, type PoolObjectId } from './layout';
+import { builders, duckBuilders, disposeObjectResources, type BuiltObject } from './objects';
+import { duckSlots, landscapeLayout, POOL, portraitLayout, type PoolObjectId, type Slot } from './layout';
 
 export interface Anchor {
   x: number;
@@ -36,10 +38,11 @@ export interface EngineOptions {
 }
 
 interface ObjState {
-  id: PoolObjectId;
+  /** null for decorative floats, which link nowhere */
+  id: PoolObjectId | null;
   holder: THREE.Group;
   built: BuiltObject;
-  hit: THREE.Mesh;
+  slots: { landscape: Slot; portrait: Slot };
   home: THREE.Vector2;
   pos: THREE.Vector2;
   vel: THREE.Vector2;
@@ -58,11 +61,19 @@ interface ObjState {
   diving: boolean;
 }
 
+/** Sun, as direction towards it. Upper left on screen in either orientation. */
+const SUN_LANDSCAPE: [number, number, number] = [-0.4, 1.0, -0.22];
+const SUN_PORTRAIT: [number, number, number] = [-0.22, 1.0, 0.4];
+
+/** Camera tilt from straight down, in radians: enough to see the far wall. */
+const TILT_LANDSCAPE = 0.54;
+const TILT_PORTRAIT = 0.36;
+
 const { halfX: W, halfZ: L, depth: D, rimH: RIM, coping: COPING } = POOL;
 
 /**
  * Real-time pool: heightfield water simulation on the GPU, caustics, a
- * ray-traced tiled interior, a tiled deck, and seven floating objects.
+ * ray-traced tiled interior, a tiled deck, seven linked floats and a few ducks.
  * All state lives here; React only mounts it and draws DOM labels.
  */
 export class PoolEngine {
@@ -75,6 +86,9 @@ export class PoolEngine {
   private rtA: THREE.WebGLRenderTarget;
   private rtB: THREE.WebGLRenderTarget;
   private causticRT: THREE.WebGLRenderTarget;
+  private causticScratch: THREE.WebGLRenderTarget;
+  private causticBlur: THREE.ShaderMaterial;
+  private rippleTex: THREE.DataTexture;
   private causticScene = new THREE.Scene();
   private dropMat: THREE.ShaderMaterial;
   private updateMat: THREE.ShaderMaterial;
@@ -85,6 +99,7 @@ export class PoolEngine {
   private deckMat: THREE.ShaderMaterial;
   private shared: Record<string, THREE.IUniform>;
   private objects: ObjState[] = [];
+  private hits: THREE.Object3D[] = [];
   private floatShadows: FloatShadows;
   private drops: THREE.Vector4[] = [];
   private raycaster = new THREE.Raycaster();
@@ -150,8 +165,24 @@ export class PoolEngine {
     };
     this.rtA = new THREE.WebGLRenderTarget(simW, simH, rtOpts);
     this.rtB = new THREE.WebGLRenderTarget(simW, simH, rtOpts);
-    const cRes = opts.coarse ? 640 : 1024;
+    // Deliberately small: the map is blurred, and low resolution helps it stay soft.
+    const cRes = opts.coarse ? 384 : 512;
     this.causticRT = new THREE.WebGLRenderTarget(cRes, Math.round((cRes * L) / W), rtOpts);
+    this.causticScratch = new THREE.WebGLRenderTarget(cRes, Math.round((cRes * L) / W), rtOpts);
+    this.causticBlur = new THREE.ShaderMaterial({
+      vertexShader: fullscreenVert,
+      fragmentShader: blurFrag,
+      uniforms: { tex: { value: null }, direction: { value: new THREE.Vector2() } },
+      depthTest: false,
+      depthWrite: false,
+    });
+    const rippleSize = opts.coarse ? 128 : 192;
+    this.rippleTex = new THREE.DataTexture(buildRippleMap(rippleSize), rippleSize, rippleSize, THREE.RGBAFormat);
+    this.rippleTex.wrapS = this.rippleTex.wrapT = THREE.RepeatWrapping;
+    this.rippleTex.minFilter = THREE.LinearMipmapLinearFilter;
+    this.rippleTex.magFilter = THREE.LinearFilter;
+    this.rippleTex.generateMipmaps = true;
+    this.rippleTex.needsUpdate = true;
 
     const delta = new THREE.Vector2(1 / simW, 1 / simH);
     this.dropMat = new THREE.ShaderMaterial({
@@ -196,10 +227,10 @@ export class PoolEngine {
       ink.textAlign = 'center';
       ink.textBaseline = 'middle';
       ink.fillStyle = '#fff';
-      ink.font = '400 192px "Piedra", Georgia, serif';
-      ink.fillText('Martin Zhong', 768, 442, 1120);
-      ink.font = '400 76px "Geo", ui-monospace, monospace';
-      ink.fillText('welcome to my world', 768, 582, 900);
+      ink.font = '400 190px "Piedra", Georgia, serif';
+      ink.fillText('Martin Zhong', 768, 440, 1000);
+      ink.font = '400 80px "Geo", ui-monospace, monospace';
+      ink.fillText('welcome to my world', 768, 588, 820);
       if (this.floorTypeTex) this.floorTypeTex.needsUpdate = true;
     };
     paintLettering();
@@ -213,7 +244,7 @@ export class PoolEngine {
     this.leafTex = paintFoliage();
 
     // --- Shared pool uniforms ----------------------------------------
-    const light = new THREE.Vector3(-0.35, 1.0, -0.56).normalize();
+    const light = new THREE.Vector3(...SUN_LANDSCAPE).normalize();
     this.shared = {
       halfSize: { value: new THREE.Vector2(W, L) },
       depth: { value: D },
@@ -241,7 +272,7 @@ export class PoolEngine {
         light: this.shared.light,
         halfSize: this.shared.halfSize,
         depth: this.shared.depth,
-        focusGain: { value: 6.5 },
+        focusGain: { value: 8.5 },
       },
       blending: THREE.AdditiveBlending,
       transparent: true,
@@ -261,11 +292,12 @@ export class PoolEngine {
         ...this.shared,
         water: { value: null },
         sunDir: { value: light },
-        absorb: { value: new THREE.Vector3(0.62, 0.055, 0.02) },
-        deepColor: { value: new THREE.Vector3(0.02, 0.62, 0.86) },
+        absorb: { value: new THREE.Vector3(0.66, 0.1, 0.03) },
+        deepColor: { value: new THREE.Vector3(0.05, 0.58, 0.9) },
         time: { value: 0 },
         footprintTex: { value: null },
         contactTex: { value: null },
+        rippleTex: { value: this.rippleTex },
       },
     });
     const water = new THREE.Mesh(gridGeo(simW, simH), this.waterMat);
@@ -305,8 +337,8 @@ export class PoolEngine {
     this.scene.environment = this.envRT.texture;
     this.scene.environmentIntensity = 0.42;
     // Turquoise bounce from the water fills the undersides.
-    this.scene.add(new THREE.HemisphereLight(0xfffaf0, 0x53d4e6, 0.95));
-    const sun = new THREE.DirectionalLight(0xfff1dc, 2.05);
+    this.scene.add(new THREE.HemisphereLight(0xfffaf0, 0x53d4e6, 1.0));
+    const sun = new THREE.DirectionalLight(0xfff1dc, 2.3);
     sun.position.copy(light).multiplyScalar(6);
     this.scene.add(sun);
 
@@ -326,23 +358,26 @@ export class PoolEngine {
     }
 
     // --- Objects -------------------------------------------------------
-    opts.ids.forEach((id, i) => {
-      const built = builders[id]();
+    const addFloat = (id: PoolObjectId | null, built: BuiltObject, slots: ObjState['slots']) => {
       const holder = new THREE.Group();
       holder.add(built.group);
-      const hit = new THREE.Mesh(
-        new THREE.CylinderGeometry(built.radius * 1.12, built.radius * 1.12, built.top + 0.16, 24),
-        new THREE.MeshBasicMaterial({ visible: false }),
-      );
-      hit.position.y = built.top / 2;
-      hit.userData.id = id;
-      holder.add(hit);
+      if (id) {
+        const hit = new THREE.Mesh(
+          new THREE.CylinderGeometry(built.radius * 1.12, built.radius * 1.12, built.top + 0.16, 24),
+          new THREE.MeshBasicMaterial({ visible: false }),
+        );
+        hit.position.y = built.top / 2;
+        hit.userData.id = id;
+        holder.add(hit);
+        this.hits.push(hit);
+      }
       this.scene.add(holder);
+      const i = this.objects.length;
       this.objects.push({
         id,
         holder,
         built,
-        hit,
+        slots,
         home: new THREE.Vector2(),
         pos: new THREE.Vector2(),
         vel: new THREE.Vector2(),
@@ -359,7 +394,9 @@ export class PoolEngine {
         dive: 0,
         diving: false,
       });
-    });
+    };
+    opts.ids.forEach((id) => addFloat(id, builders[id](), { landscape: landscapeLayout[id], portrait: portraitLayout[id] }));
+    duckBuilders.forEach((build, i) => addFloat(null, build(), duckSlots[i]));
 
     this.floatShadows = new FloatShadows(this.renderer, this.objects.map(o => o.built.group), this.shared.halfSize.value, D, light, opts.coarse);
     this.shared.shadowTex.value = this.floatShadows.target.texture;
@@ -506,10 +543,7 @@ export class PoolEngine {
   /* ----------------------------------------------------------- picking */
   private pick(): PoolObjectId | null {
     this.raycaster.setFromCamera(this.ndc, this.camera);
-    const hits = this.raycaster.intersectObjects(
-      this.objects.map((o) => o.hit),
-      false,
-    );
+    const hits = this.raycaster.intersectObjects(this.hits, false);
     return hits.length ? (hits[0].object.userData.id as PoolObjectId) : null;
   }
 
@@ -599,15 +633,17 @@ export class PoolEngine {
     this.shared.portraitMode.value = portrait ? 1 : 0;
     // The texture artwork is lit from screen upper-left. Rotate world sunlight
     // with the portrait camera so floor shadows always fall screen lower-right.
-    this.shared.light.value.set(-0.35, 1.0, portrait ? 0.56 : -0.56).normalize();
-    this.scene.environmentRotation.y = portrait ? 2 * Math.atan2(0.56, 0.35) : 0;
+    this.shared.light.value.set(...(portrait ? SUN_PORTRAIT : SUN_LANDSCAPE)).normalize();
+    this.scene.environmentRotation.y = portrait ? Math.PI / 2 : 0;
     const sunlight = this.scene.children.find(n => n instanceof THREE.DirectionalLight);
     sunlight?.position.copy(this.shared.light.value).multiplyScalar(6);
     const a = portrait ? L : W; // half extent along screen-x
     const b = portrait ? W : L; // half extent along screen-y
-    const s = Math.max(a / (f.w / 2), b / (f.h / 2)); // world units per CSS px at rim
+    const tilt = portrait ? TILT_PORTRAIT : TILT_LANDSCAPE;
+    const s = Math.max(a / (f.w / 2), (b * Math.cos(tilt)) / (f.h / 2)); // world units per CSS px at rim
     const fov = THREE.MathUtils.degToRad(this.camera.fov);
-    const dist = (s * (ch / 2)) / Math.tan(fov / 2);
+    // Stand back far enough that the near rim, the widest part, fits the frame.
+    const dist = (s * (ch / 2)) / Math.tan(fov / 2) + b * Math.sin(tilt);
     this.camDist = dist;
     this.camera.aspect = cw / ch;
     this.camera.up.set(portrait ? -1 : 0, 0, portrait ? 0 : -1);
@@ -615,9 +651,8 @@ export class PoolEngine {
     this.placeCamera();
 
     if (changed) {
-      const layout = portrait ? portraitLayout : landscapeLayout;
       for (const o of this.objects) {
-        const slot = layout[o.id];
+        const slot = portrait ? o.slots.portrait : o.slots.landscape;
         const m = 0.9;
         const hx = portrait ? slot.sy * W * m : slot.sx * W * m;
         const hz = portrait ? -slot.sx * L * m : slot.sy * L * m;
@@ -639,12 +674,12 @@ export class PoolEngine {
   private placeCamera() {
     const px = this.opts.reducedMotion ? 0 : this.parallax.x * 0.05;
     const pz = this.opts.reducedMotion ? 0 : -this.parallax.y * 0.035;
-    const ox = this.portrait ? -pz : px;
-    const oz = this.portrait ? -px : pz;
-    const depthBias = this.portrait ? 0.16 : 0.22;
-    const yawBias = this.portrait ? -0.08 : 0.0;
-    this.camera.position.set(ox + yawBias, RIM + this.camDist * 0.94, oz + this.camDist * depthBias);
-    this.camera.lookAt(0, RIM - 0.04, this.portrait ? -0.02 : 0.08);
+    const tilt = this.portrait ? TILT_PORTRAIT : TILT_LANDSCAPE;
+    const back = this.camDist * Math.sin(tilt); // towards the bottom of the screen
+    const up = RIM + this.camDist * Math.cos(tilt);
+    if (this.portrait) this.camera.position.set(back - pz, up, -px);
+    else this.camera.position.set(px, up, back + pz);
+    this.camera.lookAt(0, RIM - 0.04, 0);
     this.camera.updateProjectionMatrix();
     this.shiftM.set(1, 0, 0, this.ndcShift.x, 0, 1, 0, this.ndcShift.y, 0, 0, 1, 0, 0, 0, 0, 1);
     this.camera.projectionMatrix.premultiply(this.shiftM);
@@ -720,6 +755,17 @@ export class PoolEngine {
       r.setClearColor(0x000000, 1);
       r.clear();
       r.render(this.causticScene, this.simCam);
+      // Soften it in two passes, sharing the fullscreen quad with the simulation.
+      const u = this.causticBlur.uniforms;
+      this.simQuad.material = this.causticBlur;
+      u.tex.value = this.causticRT.texture;
+      u.direction.value.set(0.7 / this.causticRT.width, 0);
+      r.setRenderTarget(this.causticScratch);
+      r.render(this.simScene, this.simCam);
+      u.tex.value = this.causticScratch.texture;
+      u.direction.value.set(0, 0.7 / this.causticRT.height);
+      r.setRenderTarget(this.causticRT);
+      r.render(this.simScene, this.simCam);
     }
 
     // --- Main view
@@ -754,14 +800,23 @@ export class PoolEngine {
     const active = this.hoverId ?? this.focusId;
     for (const o of this.objects) {
       // Light buoyancy: keep drifting for a moment, then return slowly toward
-      // each project's starting area rather than snapping into place.
-      const k = rm ? 4.0 : 1.15;
-      const c = rm ? 3.0 : 1.35;
-      o.vel.x += ((o.home.x - o.pos.x) * k - o.vel.x * c) * dt;
-      o.vel.y += ((o.home.y - o.pos.y) * k - o.vel.y * c) * dt;
+      // each float's starting area rather than snapping into place. Ducks pull
+      // less, and paddle around a slowly wandering home of their own.
+      const decor = !o.id;
+      const k = rm ? 4.0 : decor ? 0.5 : 1.15;
+      const c = rm ? 3.0 : decor ? 0.9 : 1.35;
+      const homeX = o.home.x + (decor && !rm ? Math.sin(this.time * 0.13 + o.phase) * 0.2 : 0);
+      const homeZ = o.home.y + (decor && !rm ? Math.cos(this.time * 0.1 + o.phase * 1.7) * 0.05 : 0);
+      o.vel.x += ((homeX - o.pos.x) * k - o.vel.x * c) * dt;
+      o.vel.y += ((homeZ - o.pos.y) * k - o.vel.y * c) * dt;
       o.vel.clampLength(0, 0.85);
       const speed = o.vel.length();
       o.pos.addScaledVector(o.vel, dt);
+      // Ducks turn to face where they are going.
+      if (decor && speed > 0.008) {
+        const turn = Math.atan2(o.vel.x, o.vel.y) - o.yaw;
+        o.yaw += Math.atan2(Math.sin(turn), Math.cos(turn)) * (1 - Math.exp(-dt * 1.2));
+      }
       const target = active === o.id ? 1 : 0;
       o.hover += (target - o.hover) * (1 - Math.exp(-dt * 12));
       o.dive += ((o.diving ? 1 : 0) - o.dive) * (1 - Math.exp(-dt * 7));
@@ -799,8 +854,8 @@ export class PoolEngine {
         if (speed > 0.05) this.queueDrop(o.pos.x - o.vel.x * 0.15, o.pos.y - o.vel.y * 0.15, r * 0.6, speed * 0.004);
         // An occasional low ring off the hull, as the float settles.
         if (!rm && this.time >= o.nextRipple) {
-          this.queueDrop(o.pos.x, o.pos.y, Math.max(0.055, r * 0.85), -0.0016);
-          o.nextRipple = this.time + 1.7 + 0.2 * o.phase;
+          this.queueDrop(o.pos.x, o.pos.y, Math.max(0.05, r * 0.72), -0.016);
+          o.nextRipple = this.time + 1.3 + 0.2 * o.phase;
         }
       }
       o.prevY = y;
@@ -859,6 +914,7 @@ export class PoolEngine {
   private emitAnchors() {
     const rightW = this.tmpV3b.set(1, 0, 0).applyQuaternion(this.camera.quaternion);
     for (const o of this.objects) {
+      if (!o.id) continue;
       const p = this.tmpV3.set(o.pos.x, o.holder.position.y + o.built.top * o.scale * 0.5, o.pos.y);
       const r = o.built.radius * o.holder.scale.x;
       const edge = p.clone().addScaledVector(rightW, r).project(this.camera);
@@ -924,6 +980,9 @@ export class PoolEngine {
     this.rtA.dispose();
     this.rtB.dispose();
     this.causticRT.dispose();
+    this.causticScratch.dispose();
+    this.causticBlur.dispose();
+    this.rippleTex.dispose();
     this.envRT?.dispose();
     this.floorTypeTex.dispose();
     this.leafTex.dispose();
@@ -964,8 +1023,11 @@ function skyDome(sunDir: THREE.Vector3) {
  */
 function paintFoliage() {
   const canvas = document.createElement('canvas');
-  canvas.width = canvas.height = 256;
+  canvas.width = canvas.height = 512;
   const c = canvas.getContext('2d');
+  c?.scale(2, 2);
+  let wobble = 3;
+  const jitter = () => ((wobble = (wobble * 7919) % 1009) / 1009 - 0.5);
   const frond = (x: number, y: number, angle: number, length: number, leaves: number) => {
     if (!c) return;
     c.save();
@@ -973,25 +1035,41 @@ function paintFoliage() {
     c.rotate(angle);
     for (let i = 1; i <= leaves; i++) {
       const along = (i / leaves) * length;
-      const size = length * 0.42 * Math.sin((i / leaves) * Math.PI * 0.86 + 0.14);
+      const size = length * 0.46 * Math.sin((i / leaves) * Math.PI * 0.86 + 0.14);
       for (const side of [1, -1]) {
+        const reach = size * (0.85 + jitter() * 0.5);
+        const sweep = along + reach * (0.8 + jitter() * 0.4);
         c.beginPath();
         c.moveTo(along, 0);
-        c.quadraticCurveTo(along + size * 0.45, side * size * 0.34, along + size * 0.72, side * size);
-        c.quadraticCurveTo(along + size * 0.2, side * size * 0.42, along, 0);
+        c.quadraticCurveTo(along + reach * 0.4, side * reach * 0.42, sweep, side * reach);
+        c.quadraticCurveTo(along + reach * 0.12, side * reach * 0.3, along + 0.6, 0);
         c.fill();
       }
     }
     c.restore();
+  };
+  const round = (x: number, y: number, count: number, spread: number) => {
+    if (!c) return;
+    for (let i = 0; i < count; i++) {
+      const a = i * 2.39996;
+      const d = Math.sqrt(i / count) * spread;
+      c.beginPath();
+      c.ellipse(x + Math.cos(a) * d, y + Math.sin(a) * d, 3.2 + (i % 3), 1.8 + (i % 2), a, 0, Math.PI * 2);
+      c.fill();
+    }
   };
   if (c) {
     c.fillStyle = '#000';
     c.fillRect(0, 0, 256, 256);
     c.fillStyle = '#fff';
     // Palm over the top-left corner, towards the sun, reaching over the coping.
-    for (const [a, l] of [[0.1, 46], [0.62, 56], [1.15, 54], [1.75, 42], [-0.42, 36]] as const) frond(50, 66, a, l, 11);
-    // Lower growth on the far corner, on the deck.
-    for (const [a, l] of [[3.5, 40], [4.05, 44], [2.95, 34], [4.6, 30]] as const) frond(214, 190, a, l, 10);
+    for (const [a, l] of [[0.1, 46], [0.62, 56], [1.15, 54], [1.75, 42], [-0.42, 36]] as const) frond(50, 66, a, l, 9);
+    // Leafy trees past the left deck and along the top edge.
+    round(28, 150, 34, 30);
+    round(120, 34, 26, 26);
+    // Palm reaching in from the far corner, along the bottom and right decks.
+    for (const [a, l] of [[3.5, 40], [4.05, 44], [2.95, 34], [4.6, 30]] as const) frond(214, 190, a, l, 8);
+    round(150, 222, 30, 24);
   }
   const texture = new THREE.CanvasTexture(canvas);
   texture.minFilter = THREE.LinearFilter;

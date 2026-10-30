@@ -85,7 +85,7 @@ export async function buildSite({ dev = false, log = true } = {}) {
       css: cssFile,
       scripts: [scripts[route.entry]],
       // The pool letters its floor with Piedra and Geo before first paint.
-      preload: route.entry === 'home' ? ['/fonts/piedra.woff2', '/fonts/geo.woff2'] : ['/fonts/source-serif-4.woff', '/fonts/piedra.woff2'],
+      preload: route.entry === 'home' ? ['/fonts/piedra.woff2', '/fonts/geo.woff2'] : ['/fonts/special-elite.woff2', '/fonts/piedra.woff2'],
     });
     if (dev) html = html.replace('</body>', `<script>${LIVE_RELOAD}</script></body>`);
     const file = join(dist, route.file);

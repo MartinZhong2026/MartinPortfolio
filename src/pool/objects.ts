@@ -1,15 +1,14 @@
 import * as THREE from 'three';
-import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type { PoolObjectId } from './layout';
 
 /**
- * Everything floating in the pool. Project floats are small branded kickboards,
- * each pushed along by a rubber duck wearing one project-themed accessory; a
- * paper boat sails to About and a swim ring to Life. Every builder returns a
- * group whose top faces +y, whose "screen-up" points -z and whose waterline
- * sits at y = 0. Anything below y = 0 is hidden by the opaque water mesh and
- * drawn by the water shader from the footprint map instead (FloatShadows).
+ * Everything floating in the pool. Projects are thick branded cushions, a paper
+ * boat sails to About, a swim ring to Life, and a few rubber ducks drift around
+ * for company. Every builder returns a group whose top faces +y, whose
+ * "screen-up" points -z and whose waterline sits at y = 0. Anything below y = 0
+ * is hidden by the opaque water mesh and drawn by the water shader from the
+ * footprint map instead (FloatShadows).
  */
 export interface BuiltObject {
   group: THREE.Group;
@@ -73,69 +72,277 @@ const ramp = (a: number, b: number, x: number) => {
   return t * t * (3 - 2 * t);
 };
 
-/* ------------------------------------------------------------- */
-/* Rubber duck                                                      */
-/* ------------------------------------------------------------- */
-type Accessory = 'headphones' | 'goggles' | 'glasses' | 'snorkel' | 'sunhat';
+const signedPow = (n: number, e: number) => Math.sign(n) * Math.pow(Math.abs(n), e);
 
-const accessoryBuilders: Record<Accessory, (accent: string, head: THREE.Group) => void> = {
-  // Meetfolio records and transcribes conversations.
-  headphones(accent, head) {
-    const band = mesh(shared('hp-band', () => new THREE.TorusGeometry(0.56, 0.06, 10, 32, Math.PI)), vinyl(accent, 0.34));
-    band.position.y = 0.04;
-    head.add(band);
-    const cups = shared('hp-cup', () => new THREE.CapsuleGeometry(0.17, 0.08, 6, 16));
-    for (const side of [1, -1]) {
-      const cup = mesh(cups, matte('#f7f4ec', 0.38), side * 0.56, 0.03, 0);
-      cup.rotation.z = Math.PI / 2;
-      head.add(cup);
+const fontsReady = (): Promise<void> => {
+  const f = (globalThis as { document?: Document }).document?.fonts;
+  if (!f) return Promise.resolve();
+  return f.load('400 40px "Cherry Cream Soda"').then(() => undefined).catch(() => undefined);
+};
+
+function canvasTexture(width: number, height: number) {
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const texture = track(new THREE.CanvasTexture(canvas));
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.anisotropy = 8;
+  return { canvas, texture, c: canvas.getContext('2d') };
+}
+
+/* ------------------------------------------------------------- */
+/* Project cushions                                                 */
+/* ------------------------------------------------------------- */
+type BrandId = 'meetfolio' | 'abtrace' | 'document-ai' | 'fanscope' | 'adapt-to-china';
+
+/** Share of each supplied icon that holds the mark, and how much of the face it fills. */
+const FACES: Record<BrandId, { body: string; ink: string; name: string | null; crop: number; mark: number }> = {
+  'adapt-to-china': { body: '#f7f2ea', ink: '#1d3a5f', name: null, crop: 1, mark: 1 },
+  meetfolio: { body: '#245a47', ink: '#ffffff', name: 'Meetfolio', crop: 0.72, mark: 0.54 },
+  abtrace: { body: '#0f5c52', ink: '#ffffff', name: 'AbTrace', crop: 0.82, mark: 0.6 },
+  'document-ai': { body: '#f4f7fa', ink: '#1d3a5f', name: 'Document AI', crop: 0.86, mark: 0.6 },
+  fanscope: { body: '#173a63', ink: '#ffffff', name: 'FanScope', crop: 1, mark: 0.44 },
+};
+
+/** Paint the cushion's top: the brand mark, feathered into its colour, and its name. */
+function paintFace(id: BrandId, c: CanvasRenderingContext2D, size: number, icon: HTMLImageElement | null) {
+  const f = FACES[id];
+  c.clearRect(0, 0, size, size);
+  c.fillStyle = f.body;
+  c.fillRect(0, 0, size, size);
+  if (icon && id === 'adapt-to-china') {
+    const inset = size * 0.08;
+    c.drawImage(icon, inset, inset, size - inset * 2, size - inset * 2);
+  } else if (icon) {
+    const off = document.createElement('canvas');
+    off.width = off.height = size;
+    const o = off.getContext('2d')!;
+    const crop = icon.width * f.crop;
+    const from = (icon.width - crop) / 2;
+    const mark = size * f.mark;
+    const x = (size - mark) / 2;
+    const y = size * 0.15;
+    o.drawImage(icon, from, from, crop, crop, x, y, mark, mark);
+    o.globalCompositeOperation = 'destination-in';
+    const feather = o.createRadialGradient(size / 2, y + mark / 2, mark * 0.44, size / 2, y + mark / 2, mark * 0.6);
+    feather.addColorStop(0, 'rgba(0,0,0,1)');
+    feather.addColorStop(1, 'rgba(0,0,0,0)');
+    o.fillStyle = feather;
+    o.fillRect(0, 0, size, size);
+    c.drawImage(off, 0, 0);
+  }
+  if (f.name) {
+    c.fillStyle = f.ink;
+    c.textAlign = 'center';
+    c.textBaseline = 'middle';
+    c.font = `400 ${Math.round(size * 0.112)}px "Cherry Cream Soda", Georgia, serif`;
+    c.fillText(f.name, size / 2, size * 0.75, size * 0.66);
+  }
+}
+
+/** A plump, rounded-square cushion (or disc), flat-topped and printed from above. */
+function cushionGeometry(round: boolean) {
+  const geo = sculptedSphere([96, 64], (v) => {
+    const y = signedPow(v.y, 0.62);
+    if (round) {
+      const r = Math.hypot(v.x, v.z) || 1;
+      const k = signedPow(r, 0.42) / r;
+      v.set(v.x * k, y, v.z * k);
+    } else {
+      v.set(signedPow(v.x, 0.42), y, signedPow(v.z, 0.42));
     }
-  },
-  // AbTrace is a laboratory workflow: safety goggles.
-  goggles(accent, head) {
-    const frame = vinyl(accent, 0.3);
-    const lens = vinyl('#c9f3ec', 0.08, { clearcoat: 1, transmission: 0, opacity: 0.86, transparent: true });
-    const rim = shared('goggle-rim', () => new THREE.TorusGeometry(0.2, 0.05, 10, 26));
-    const disc = shared('goggle-lens', () => new THREE.CircleGeometry(0.19, 24));
+  });
+  const p = geo.getAttribute('position') as THREE.BufferAttribute;
+  const uv = new Float32Array(p.count * 2);
+  for (let i = 0; i < p.count; i++) {
+    uv[i * 2] = (p.getX(i) + 1) / 2;
+    uv[i * 2 + 1] = (1 - p.getZ(i)) / 2;
+  }
+  geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+  return geo;
+}
+
+function brandFloat(id: BrandId): BuiltObject {
+  const round = id === 'adapt-to-china';
+  const half = round ? 0.235 : 0.148;
+  const height = round ? 0.108 : 0.122;
+  const { canvas, texture, c } = canvasTexture(512, 512);
+  let icon: HTMLImageElement | null = null;
+  const repaint = () => {
+    if (!c) return;
+    paintFace(id, c, canvas.width, icon);
+    texture.needsUpdate = true;
+  };
+  repaint();
+  const img = new Image();
+  img.decoding = 'async';
+  img.onload = () => {
+    icon = img;
+    repaint();
+  };
+  img.src = `/assets/icons/${id}.png`;
+  fontsReady().then(repaint);
+
+  const body = mesh(
+    shared(round ? 'cushion-round' : 'cushion-square', () => cushionGeometry(round)),
+    vinyl('#ffffff', 0.44, { map: texture, clearcoat: 0.8, clearcoatRoughness: 0.2, envMapIntensity: 0.55 }),
+    0,
+    height * 0.14,
+    0,
+  );
+  body.scale.set(half, height / 2, half);
+  const group = new THREE.Group();
+  group.add(body);
+  return { group, radius: half + 0.012, top: height * 0.64, mass: round ? 1.7 : 1.1, maxTilt: round ? 0.11 : 0.17 };
+}
+
+/* ------------------------------------------------------------- */
+/* About — the folded paper boat                                    */
+/* ------------------------------------------------------------- */
+function paperBoat(): BuiltObject {
+  const boat = new THREE.Group();
+  const sheet = matte('#ffffff', 0.78);
+  sheet.side = THREE.DoubleSide;
+  sheet.flatShading = true;
+  const shade = matte('#dfe8ea', 0.84);
+  shade.side = THREE.DoubleSide;
+  shade.flatShading = true;
+  const L = 0.235; // bow and stern
+  const K = 0.115; // keel half length
+  const B = 0.088; // half beam at the gunwale
+  const H = 0.082; // gunwale height
+  const D = -0.03; // keel depth
+  const mid = 0.085; // where the gunwale reaches full beam
+  const tris = (points: number[], mat: THREE.Material, uvs?: number[]) => {
+    const g = track(new THREE.BufferGeometry());
+    g.setAttribute('position', new THREE.Float32BufferAttribute(points, 3));
+    if (uvs) g.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+    g.computeVertexNormals();
+    boat.add(new THREE.Mesh(g, mat));
+  };
+
+  // The camera-side hull carries the name, as a printed paper boat would.
+  const { canvas, texture, c } = canvasTexture(1024, 256);
+  const paintHull = () => {
+    if (!c) return;
+    c.fillStyle = '#fdfdfa';
+    c.fillRect(0, 0, canvas.width, canvas.height);
+    c.fillStyle = '#1d3a5f';
+    c.textAlign = 'center';
+    c.textBaseline = 'middle';
+    c.font = '400 92px "Cherry Cream Soda", Georgia, serif';
+    c.fillText('About Martin', 512, 128, 640);
+    texture.needsUpdate = true;
+  };
+  paintHull();
+  fontsReady().then(paintHull);
+  const printed = track(new THREE.MeshStandardMaterial({ map: texture, roughness: 0.78, side: THREE.DoubleSide }));
+
+  for (const s of [1, -1]) {
+    const hull = [
+      [-L, H, 0], [-K, D, 0], [-mid, H, s * B],
+      [-mid, H, s * B], [-K, D, 0], [K, D, 0],
+      [-mid, H, s * B], [K, D, 0], [mid, H, s * B],
+      [mid, H, s * B], [K, D, 0], [L, H, 0],
+    ];
+    const uvs = hull.flatMap(([x, y]) => [(x + L) / (2 * L), (y - D) / (H - D)]);
+    tris(hull.flat(), s > 0 ? printed : shade, uvs);
+    // Inside of the fold, seen from above.
+    tris([
+      -L, H, 0, -mid, H, s * B, 0, H * 0.2, 0,
+      -mid, H, s * B, mid, H, s * B, 0, H * 0.2, 0,
+      mid, H, s * B, L, H, 0, 0, H * 0.2, 0,
+    ], shade);
+    // The two faces of the central peak.
+    tris([-0.11, H * 0.6, s * 0.02, 0.11, H * 0.6, s * 0.02, 0, H + 0.17, 0], s > 0 ? sheet : shade);
+  }
+  // Heeled away from the camera, which lifts the printed side into view.
+  boat.rotation.x = -0.62;
+  boat.position.y = 0.036;
+  const group = new THREE.Group();
+  group.add(boat);
+  return {
+    group,
+    radius: 0.17,
+    top: 0.24,
+    mass: 0.7,
+    maxTilt: 0.14,
+    animate(time) {
+      boat.rotation.z = Math.sin(time * 1.1) * 0.04;
+    },
+  };
+}
+
+/* ------------------------------------------------------------- */
+/* Life — a striped swim ring                                       */
+/* ------------------------------------------------------------- */
+function swimRing(): BuiltObject {
+  const { canvas, texture, c } = canvasTexture(1024, 256);
+  texture.wrapS = THREE.RepeatWrapping;
+  const paint = () => {
+    if (!c) return;
+    const segments = 8;
+    const w = canvas.width / segments;
+    for (let i = 0; i < segments; i++) {
+      c.fillStyle = i % 2 ? '#fff8ee' : '#f2553d';
+      c.fillRect(i * w, 0, w + 1, canvas.height);
+    }
+    // Printed across the top of the tube, on the white segments only.
+    c.fillStyle = '#c93a24';
+    c.textAlign = 'center';
+    c.textBaseline = 'middle';
+    c.font = '400 58px "Cherry Cream Soda", Georgia, serif';
+    for (const i of [1, 5]) {
+      c.save();
+      c.translate((i + 0.5) * w, canvas.height * 0.25);
+      c.rotate(Math.PI);
+      c.fillText('Life', 0, 0);
+      c.restore();
+    }
+    texture.needsUpdate = true;
+  };
+  paint();
+  fontsReady().then(paint);
+  const R = 0.122;
+  const r = 0.056;
+  const tube = mesh(track(new THREE.TorusGeometry(R, r, 28, 96)), vinyl('#ffffff', 0.24, { map: texture, clearcoat: 1, clearcoatRoughness: 0.12 }), 0, 0.016, 0);
+  tube.rotation.x = Math.PI / 2;
+  const valve = mesh(track(new THREE.CapsuleGeometry(0.008, 0.014, 4, 8)), matte('#f2d9c9', 0.4), R * 0.72, 0.07, R * 0.72);
+  const group = new THREE.Group();
+  group.add(tube, valve);
+  return { group, radius: R + r, top: 0.08, mass: 0.9, maxTilt: 0.18 };
+}
+
+/* ------------------------------------------------------------- */
+/* Rubber ducks                                                     */
+/* ------------------------------------------------------------- */
+type Accessory = 'sunglasses' | 'snorkel' | 'sunhat';
+
+const accessoryBuilders: Record<Accessory, (head: THREE.Group) => void> = {
+  sunglasses(head) {
+    const frame = matte('#14171c', 0.26, 0.2);
+    const rim = shared('shade-rim', () => new THREE.TorusGeometry(0.17, 0.03, 8, 26));
+    const disc = shared('shade-lens', () => new THREE.CircleGeometry(0.165, 24));
+    const lens = vinyl('#1b2430', 0.1);
     for (const side of [1, -1]) {
       const eye = new THREE.Group();
-      eye.position.set(side * 0.235, 0.21, 0.42);
-      eye.rotation.set(-0.5, side * 0.42, 0);
+      eye.position.set(side * 0.215, 0.16, 0.47);
+      eye.rotation.set(-0.3, side * 0.42, 0);
       eye.add(new THREE.Mesh(rim, frame), new THREE.Mesh(disc, lens));
       head.add(eye);
     }
-    const strap = mesh(shared('goggle-strap', () => new THREE.TorusGeometry(0.53, 0.035, 8, 40)), frame, 0, 0.1, 0);
-    strap.rotation.x = Math.PI / 2 - 0.3;
-    head.add(strap);
-  },
-  // Document AI reads every page: round reading glasses.
-  glasses(accent, head) {
-    const frame = matte(accent, 0.28, 0.35);
-    const rim = shared('glass-rim', () => new THREE.TorusGeometry(0.17, 0.026, 8, 26));
-    const disc = shared('glass-lens', () => new THREE.CircleGeometry(0.16, 24));
-    const lens = vinyl('#ffffff', 0.05, { transparent: true, opacity: 0.28 });
-    for (const side of [1, -1]) {
-      const eye = new THREE.Group();
-      eye.position.set(side * 0.215, 0.2, 0.44);
-      eye.rotation.set(-0.55, side * 0.4, 0);
-      eye.add(new THREE.Mesh(rim, frame), new THREE.Mesh(disc, lens));
-      head.add(eye);
-    }
-    const bridge = mesh(shared('glass-bridge', () => new THREE.CapsuleGeometry(0.022, 0.1, 4, 8)), frame, 0, 0.27, 0.5);
+    const bridge = mesh(shared('shade-bridge', () => new THREE.CapsuleGeometry(0.024, 0.1, 4, 8)), frame, 0, 0.2, 0.53);
     bridge.rotation.z = Math.PI / 2;
     head.add(bridge);
   },
-  // FanScope dives into research: mask and snorkel.
-  snorkel(accent, head) {
-    const mask = vinyl(accent, 0.3);
-    const visor = mesh(shared('mask-visor', () => new THREE.SphereGeometry(0.34, 20, 14)), vinyl('#a9e9f2', 0.06, { clearcoat: 1 }), 0, 0.2, 0.34);
+  snorkel(head) {
+    const mask = vinyl('#1f9a96', 0.3);
+    const visor = mesh(shared('mask-visor', () => new THREE.SphereGeometry(0.34, 20, 14)), vinyl('#a9e9f2', 0.06, { clearcoat: 1 }), 0, 0.17, 0.36);
     visor.scale.set(1.15, 0.62, 0.62);
-    visor.rotation.x = -0.5;
-    const skirt = mesh(shared('mask-skirt', () => new THREE.SphereGeometry(0.39, 20, 14)), mask, 0, 0.19, 0.3);
+    const skirt = mesh(shared('mask-skirt', () => new THREE.SphereGeometry(0.39, 20, 14)), mask, 0, 0.16, 0.32);
     skirt.scale.set(1.16, 0.68, 0.56);
-    skirt.rotation.x = -0.5;
-    const strap = mesh(shared('goggle-strap', () => new THREE.TorusGeometry(0.53, 0.035, 8, 40)), mask, 0, 0.1, 0);
-    strap.rotation.x = Math.PI / 2 - 0.3;
+    const strap = mesh(shared('mask-strap', () => new THREE.TorusGeometry(0.53, 0.035, 8, 40)), mask, 0, 0.1, 0);
+    strap.rotation.x = Math.PI / 2 - 0.1;
     const tube = mesh(
       shared('snorkel-tube', () =>
         new THREE.TubeGeometry(
@@ -147,41 +354,36 @@ const accessoryBuilders: Record<Accessory, (accent: string, head: THREE.Group) =
     );
     head.add(skirt, visor, strap, tube);
   },
-  // Adapt to China is about arriving somewhere new: a traveller's sun hat.
-  sunhat(accent, head) {
+  sunhat(head) {
     const straw = matte('#f0d9a6', 0.72);
     const brim = mesh(shared('hat-brim', () => new THREE.CylinderGeometry(0.78, 0.86, 0.035, 40)), straw, 0, 0.42, -0.04);
-    brim.rotation.x = -0.14;
     const crown = mesh(shared('hat-crown', () => new THREE.SphereGeometry(0.42, 24, 14, 0, Math.PI * 2, 0, Math.PI / 2)), straw, 0, 0.42, -0.04);
-    crown.rotation.x = -0.14;
     crown.scale.y = 0.82;
-    const band = mesh(shared('hat-band', () => new THREE.CylinderGeometry(0.425, 0.43, 0.09, 32, 1, true)), matte(accent, 0.5), 0, 0.47, -0.05);
-    band.rotation.x = -0.14;
-    head.add(brim, crown, band);
+    const band = mesh(shared('hat-band', () => new THREE.CylinderGeometry(0.425, 0.43, 0.09, 32, 1, true)), matte('#d84a33', 0.5), 0, 0.47, -0.05);
+    // Pushed back off the face, the way a hat sits on someone looking up.
+    const hat = new THREE.Group();
+    hat.rotation.x = -0.5;
+    hat.position.set(0, -0.08, -0.12);
+    hat.add(brim, crown, band);
+    head.add(hat);
   },
 };
 
-interface DuckOptions {
-  body?: string;
-  accessory: Accessory;
-  accent: string;
-}
-
 /** Built around a 2-unit-long body; the caller scales it. Faces +z. */
-function rubberDuck({ body = '#ffcb2e', accessory, accent }: DuckOptions) {
+function rubberDuck(accessory?: Accessory): BuiltObject {
   const duck = new THREE.Group();
-  const rubber = vinyl(body, 0.27, { clearcoat: 0.9, clearcoatRoughness: 0.14, sheen: 0.4, sheenColor: new THREE.Color('#ff9d2e') });
+  const rubber = vinyl('#ffcb2e', 0.27, { clearcoat: 0.9, clearcoatRoughness: 0.14, sheen: 0.4, sheenColor: new THREE.Color('#ff9d2e') });
   const hull = shared('duck-body', () =>
     sculptedSphere([44, 30], (v) => {
-      // Plump from above, with only a short upturned nub of a tail.
+      // Plump, with a short upturned nub of a tail.
       const rear = ramp(-0.5, -1, v.z);
-      v.y = v.y * 0.7 + rear * 0.3;
-      v.x *= 0.92 - rear * 0.42;
-      v.z = v.z * 0.98 - rear * 0.08;
+      v.y = v.y * 0.72 + rear * 0.34;
+      v.x *= 0.9 - rear * 0.42;
+      v.z = v.z * 0.98 - rear * 0.1;
     }),
   );
-  duck.add(mesh(hull, rubber, 0, 0.2, 0));
-  const neck = mesh(shared('duck-neck', () => new THREE.SphereGeometry(0.46, 20, 14)), rubber, 0, 0.62, 0.34);
+  duck.add(mesh(hull, rubber, 0, 0.26, 0));
+  const neck = mesh(shared('duck-neck', () => new THREE.SphereGeometry(0.46, 20, 14)), rubber, 0, 0.72, 0.36);
   neck.scale.set(1, 1.1, 0.95);
   duck.add(neck);
 
@@ -196,17 +398,16 @@ function rubberDuck({ body = '#ffcb2e', accessory, accent }: DuckOptions) {
   );
   const wings: THREE.Mesh[] = [];
   for (const side of [1, -1]) {
-    const w = mesh(wing, rubber, side * 0.76, 0.36, -0.12);
+    const w = mesh(wing, rubber, side * 0.74, 0.44, -0.12);
     w.rotation.set(-0.16, side * 0.14, side * -0.42);
     duck.add(w);
     wings.push(w);
   }
 
-  // The head tips back to look up at the overhead camera, so the face reads.
   const head = new THREE.Group();
-  head.position.set(0, 1.02, 0.42);
-  head.rotation.x = -0.72;
-  head.scale.setScalar(1.16);
+  head.position.set(0, 1.18, 0.46);
+  head.rotation.x = -0.2;
+  head.scale.setScalar(1.08);
   head.add(mesh(shared('duck-head', () => new THREE.SphereGeometry(0.52, 30, 22)), rubber));
   const bill = matte('#ff8a1e', 0.34);
   const upper = mesh(
@@ -226,167 +427,28 @@ function rubberDuck({ body = '#ffcb2e', accessory, accent }: DuckOptions) {
   const pupil = matte('#101418', 0.12);
   const glint = track(new THREE.MeshBasicMaterial({ color: '#ffffff' }));
   for (const side of [1, -1]) {
-    head.add(mesh(shared('duck-eye', () => new THREE.SphereGeometry(0.082, 14, 10)), pupil, side * 0.235, 0.2, 0.42));
-    head.add(mesh(shared('duck-glint', () => new THREE.SphereGeometry(0.027, 8, 6)), glint, side * 0.235 - 0.02, 0.255, 0.465));
+    head.add(mesh(shared('duck-eye', () => new THREE.SphereGeometry(0.082, 14, 10)), pupil, side * 0.25, 0.16, 0.42));
+    head.add(mesh(shared('duck-glint', () => new THREE.SphereGeometry(0.027, 8, 6)), glint, side * 0.25 - 0.02, 0.215, 0.475));
   }
-  accessoryBuilders[accessory](accent, head);
+  if (accessory) accessoryBuilders[accessory](head);
   duck.add(head);
 
+  const scale = 0.088;
+  duck.scale.setScalar(scale);
+  const group = new THREE.Group();
+  group.add(duck);
   const phase = Math.random() * 10;
   return {
-    duck,
-    animate(time: number, hover: number) {
-      // Mostly still; every few seconds the duck glances about.
-      const glance = Math.sin(time * 0.31 + phase) * Math.sin(time * 0.13 + phase * 2);
-      head.rotation.y = glance * 0.42 + Math.sin(time * 9) * 0.1 * hover;
-      head.rotation.x = -0.72 - hover * 0.1;
-      const flap = hover * (0.22 + 0.14 * Math.sin(time * 16));
-      wings[0].rotation.z = -0.42 + flap;
-      wings[1].rotation.z = 0.42 - flap;
-    },
-  };
-}
-
-/* ------------------------------------------------------------- */
-/* Project kickboards                                               */
-/* ------------------------------------------------------------- */
-type BrandId = 'meetfolio' | 'abtrace' | 'document-ai' | 'fanscope' | 'adapt-to-china';
-
-/** Height of a board's deck above the waterline. */
-const FREEBOARD = 0.034;
-
-const FLOATS: Record<BrandId, { board: string; accessory: Accessory; accent: string; perch: number; round?: boolean }> = {
-  'adapt-to-china': { board: '#f7f2ea', accessory: 'sunhat', accent: '#d84a33', perch: 2.5, round: true },
-  meetfolio: { board: '#2b5f4c', accessory: 'headphones', accent: '#2f8f5b', perch: -2.62 },
-  abtrace: { board: '#0f5c52', accessory: 'goggles', accent: '#14a08f', perch: 2.62 },
-  'document-ai': { board: '#f4f7fa', accessory: 'glasses', accent: '#1d3a5f', perch: -2.62 },
-  fanscope: { board: '#173a63', accessory: 'snorkel', accent: '#1f9a96', perch: 2.86 },
-};
-
-function brandFloat(id: BrandId): BuiltObject {
-  const f = FLOATS[id];
-  const size = f.round ? 0.5 : 0.31;
-  const half = size / 2;
-  const thickness = 0.052;
-  const group = new THREE.Group();
-  const board = new THREE.Group();
-  group.add(board);
-  const foam = vinyl(f.board, 0.42, { clearcoat: 0.55, clearcoatRoughness: 0.3 });
-  if (f.round) {
-    board.add(mesh(track(new THREE.CylinderGeometry(half, half * 0.97, thickness, 72)), foam));
-    const lip = mesh(track(new THREE.TorusGeometry(half - 0.016, 0.022, 14, 72)), foam, 0, thickness / 2, 0);
-    lip.rotation.x = Math.PI / 2;
-    board.add(lip);
-  } else {
-    board.add(mesh(track(new RoundedBoxGeometry(size, thickness, size, 5, 0.026)), foam));
-  }
-
-  const texture = track(new THREE.TextureLoader().load(`/assets/icons/${id}.png`));
-  texture.colorSpace = THREE.SRGBColorSpace;
-  texture.anisotropy = 8;
-  const face = f.round ? track(new THREE.CircleGeometry(half - 0.03, 64)) : track(new THREE.PlaneGeometry(size * 0.86, size * 0.86));
-  face.rotateX(-Math.PI / 2);
-  // Soft and low in reflection, so the sky never washes out the brand colours.
-  const faceMat = track(new THREE.MeshStandardMaterial({ map: texture, roughness: 0.74, envMapIntensity: 0.18, transparent: true, alphaTest: 0.04 }));
-  board.add(mesh(face, faceMat, 0, thickness / 2 + 0.003, 0));
-
-  // The duck rests its chest on the board's edge, pushing it along.
-  const { duck, animate } = rubberDuck({ accessory: f.accessory, accent: f.accent });
-  const scale = 0.102;
-  const reach = half * (f.round ? 1.12 : 1.3);
-  const seat = new THREE.Group();
-  seat.position.set(Math.sin(f.perch) * reach, 0, Math.cos(f.perch) * reach);
-  seat.rotation.y = f.perch + Math.PI;
-  duck.scale.setScalar(scale);
-  seat.add(duck);
-  group.add(seat);
-
-  // The board rides high enough that its deck stays dry as it rocks.
-  board.position.y = FREEBOARD - thickness / 2;
-  return { group, radius: half + 0.075, top: 0.14, mass: f.round ? 1.6 : 1, maxTilt: (FREEBOARD / half) * 0.8, animate };
-}
-
-/* ------------------------------------------------------------- */
-/* About — the folded paper boat                                    */
-/* ------------------------------------------------------------- */
-function paperBoat(): BuiltObject {
-  const boat = new THREE.Group();
-  const sheet = matte('#ffffff', 0.8);
-  sheet.side = THREE.DoubleSide;
-  sheet.flatShading = true;
-  const shade = matte('#dbe6e8', 0.86);
-  shade.side = THREE.DoubleSide;
-  shade.flatShading = true;
-  const tris = (points: number[], mat: THREE.Material) => {
-    const g = track(new THREE.BufferGeometry());
-    g.setAttribute('position', new THREE.Float32BufferAttribute(points, 3));
-    g.computeVertexNormals();
-    boat.add(new THREE.Mesh(g, mat));
-  };
-  const L = 0.22; // bow and stern
-  const K = 0.11; // keel half length
-  const B = 0.085; // half beam at the gunwale
-  const H = 0.07; // gunwale height
-  const D = -0.03; // keel depth
-  const mid = 0.08; // where the gunwale reaches full beam
-  for (const s of [1, -1]) {
-    tris([
-      -L, H, 0, -K, D, 0, -mid, H, s * B,
-      -mid, H, s * B, -K, D, 0, K, D, 0,
-      -mid, H, s * B, K, D, 0, mid, H, s * B,
-      mid, H, s * B, K, D, 0, L, H, 0,
-    ], s > 0 ? sheet : shade);
-    // Inside of the fold, seen from above.
-    tris([
-      -L, H, 0, -mid, H, s * B, 0, H * 0.2, 0,
-      -mid, H, s * B, mid, H, s * B, 0, H * 0.2, 0,
-      mid, H, s * B, L, H, 0, 0, H * 0.2, 0,
-    ], shade);
-    // The two faces of the central peak.
-    tris([-0.1, H * 0.6, s * 0.018, 0.1, H * 0.6, s * 0.018, 0, H + 0.16, 0], s > 0 ? sheet : shade);
-  }
-  boat.rotation.x = -0.62;
-  boat.position.y = 0.014;
-  const group = new THREE.Group();
-  group.add(boat);
-  return {
     group,
-    radius: 0.17,
-    top: 0.2,
-    mass: 0.7,
-    maxTilt: 0.16,
+    radius: scale * 1.05,
+    top: scale * 1.7,
+    mass: 0.6,
+    maxTilt: 0.22,
     animate(time) {
-      boat.rotation.z = Math.sin(time * 1.1) * 0.05;
+      // Mostly still; every few seconds the duck glances about.
+      head.rotation.y = Math.sin(time * 0.31 + phase) * Math.sin(time * 0.13 + phase * 2) * 0.5;
     },
   };
-}
-
-/* ------------------------------------------------------------- */
-/* Life — a striped swim ring                                       */
-/* ------------------------------------------------------------- */
-function swimRing(): BuiltObject {
-  const canvas = document.createElement('canvas');
-  canvas.width = 512;
-  canvas.height = 64;
-  const c = canvas.getContext('2d');
-  if (c) {
-    for (let i = 0; i < 8; i++) {
-      c.fillStyle = i % 2 ? '#fff8ee' : '#f2553d';
-      c.fillRect((i * 512) / 8, 0, 512 / 8 + 1, 64);
-    }
-  }
-  const texture = track(new THREE.CanvasTexture(canvas));
-  texture.colorSpace = THREE.SRGBColorSpace;
-  texture.anisotropy = 8;
-  texture.wrapS = THREE.RepeatWrapping;
-  const R = 0.135;
-  const r = 0.062;
-  const tube = mesh(track(new THREE.TorusGeometry(R, r, 28, 96)), vinyl('#ffffff', 0.24, { map: texture, clearcoat: 1, clearcoatRoughness: 0.12 }), 0, 0.016, 0);
-  tube.rotation.x = Math.PI / 2;
-  const valve = mesh(track(new THREE.CapsuleGeometry(0.008, 0.014, 4, 8)), matte('#f2d9c9', 0.4), R * 0.72, 0.076, R * 0.72);
-  const group = new THREE.Group();
-  group.add(tube, valve);
-  return { group, radius: R + r, top: 0.08, mass: 0.9, maxTilt: 0.2 };
 }
 
 export const builders: Record<PoolObjectId, () => BuiltObject> = {
@@ -398,3 +460,6 @@ export const builders: Record<PoolObjectId, () => BuiltObject> = {
   about: paperBoat,
   life: swimRing,
 };
+
+/** One per entry in `duckSlots`. */
+export const duckBuilders: (() => BuiltObject)[] = [() => rubberDuck(), () => rubberDuck('sunglasses'), () => rubberDuck('sunhat'), () => rubberDuck('snorkel')];

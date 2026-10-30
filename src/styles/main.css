@@ -3,10 +3,11 @@
    Design tokens, base, layout and components. No framework; plain modern CSS.
    ========================================================================== */
 
-/* Typography (see AGENTS.md): Piedra for the name and major headings, Cherry
-   Cream Soda for short editorial statements, Geo for short labels, Source
-   Serif 4 for reading, JetBrains Mono for simulated UI and data. All are
-   self-hosted; licences are in /fonts/licenses/. */
+/* Typography (see AGENTS.md): Piedra for the name and major headings, Special
+   Elite for reading, Cherry Cream Soda for short statements and navigation,
+   Geo for short labels, Source Serif 4 for small headings and bold names,
+   JetBrains Mono for simulated UI and data. All are self-hosted; licences are
+   in /fonts/licenses/. */
 @font-face {
   font-family: 'Piedra';
   src: url('/fonts/piedra.woff2') format('woff2');
@@ -22,6 +23,12 @@
 @font-face {
   font-family: 'Geo';
   src: url('/fonts/geo.woff2') format('woff2');
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Special Elite';
+  src: url('/fonts/special-elite.woff2') format('woff2');
   font-weight: 400;
   font-display: swap;
 }
@@ -72,7 +79,8 @@
   --font-display: 'Piedra', 'Source Serif 4', Georgia, 'Times New Roman', serif;
   --font-editorial: 'Cherry Cream Soda', 'Source Serif 4', Georgia, 'Times New Roman', serif;
   --font-label: 'Geo', 'JetBrains Mono', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
-  --font-body: 'Source Serif 4', Georgia, 'Times New Roman', serif;
+  --font-body: 'Special Elite', 'Courier New', Courier, monospace;
+  --font-serif: 'Source Serif 4', Georgia, 'Times New Roman', serif;
   --font-mono: 'JetBrains Mono', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
 
   --gutter: clamp(16px, 4vw, 48px);
@@ -3168,8 +3176,8 @@ h1 em, h2 em { font-style: normal; }
 .brand__mark { font-size: 17px; font-weight: 400; }
 
 /* --- Section titles too small for Piedra stay in the reading serif. */
-h3, h4 { font-family: var(--font-body); font-weight: 700; letter-spacing: -0.008em; }
-.about-v6__proof-item strong, .about-v6__path strong, .about-v6__education-title strong, .about-figure figcaption strong { font-family: var(--font-body); font-weight: 700; letter-spacing: -0.008em; }
+h3, h4 { font-family: var(--font-serif); font-weight: 700; letter-spacing: -0.008em; }
+.about-v6__proof-item strong, .about-v6__path strong, .about-v6__education-title strong, .about-figure figcaption strong { font-family: var(--font-serif); font-weight: 700; letter-spacing: -0.008em; }
 .testimonial blockquote { font-family: var(--font-body); }
 
 /* --- Editorial: Cherry Cream Soda for one idea at a time, never long copy. */
@@ -3231,14 +3239,14 @@ h3, h4 { font-family: var(--font-body); font-weight: 700; letter-spacing: -0.008
 .page-home .site-header { pointer-events: none; }
 .page-home .site-header a { pointer-events: auto; }
 .pool {
-  --fw-l: min(calc(100vw - 2 * var(--gutter)), calc((100svh - var(--header-h) - var(--fw-reserve, 82px)) * 1.6), 1500px);
+  --fw-l: min(calc(100vw - 48px), calc((100svh - 34px - 62px) * 1.8), 1560px);
   --fw: max(var(--fw-l), 480px);
-  --fh: calc(var(--fw) / 1.6);
-  min-height: max(100svh, calc(var(--fh) + var(--header-h) + 82px));
+  --fh: calc(var(--fw) / 1.8);
+  min-height: max(100svh, calc(var(--fh) + 96px));
 }
-.pool__layout { padding-bottom: 6px; grid-template-rows: var(--header-h) minmax(var(--fh), 1fr) auto; }
+.pool__layout { padding-bottom: 6px; grid-template-rows: 34px minmax(var(--fh), 1fr) auto; }
 .pool__frame { align-self: center; }
-.pool__bar { padding-top: calc(var(--fw) * 0.03 + 2px); }
+.pool__bar { padding-top: 6px; }
 .page-home .nav { background: rgba(255, 253, 248, 0.82); border-radius: 999px; padding: 3px; box-shadow: var(--shadow-1); }
 .pool::before { display: none; }
 
@@ -3264,7 +3272,6 @@ h3, h4 { font-family: var(--font-body); font-weight: 700; letter-spacing: -0.008
 .pool__bar { flex-wrap: nowrap; }
 .pool__list-link { white-space: nowrap; }
 
-/* Labels are always on: touch has no hover and the floats no longer print names. */
 .pool-obj__label {
   font-size: 13px;
   padding: 2px 10px;
@@ -3274,9 +3281,14 @@ h3, h4 { font-family: var(--font-body); font-weight: 700; letter-spacing: -0.008
 }
 .pool-obj--flagship .pool-obj__label { font-size: 13px; background: #c93a24; }
 .pool-obj--place .pool-obj__label { background: var(--sun); }
-.pool--live .pool-obj__label { opacity: 1; transform: translateX(-50%); }
+/* Floats carry their own names; touch has no hover, so labels stay on there. */
+.pool--live .pool-obj__label { opacity: 0; transform: translateX(-50%) translateY(-4px); }
+.pool--live .pool-obj.is-active .pool-obj__label, .pool--live .pool-obj:focus-visible .pool-obj__label { opacity: 1; transform: translateX(-50%); }
+@media (pointer: coarse) {
+  .pool--live .pool-obj__label { opacity: 1; transform: translateX(-50%); }
+}
 .pool-obj.is-active .pool-obj__label, .pool-obj:focus-visible .pool-obj__label { background: var(--ink); color: #fff; }
-.pool-obj__tip { font-family: var(--font-body); }
+.pool-obj__tip { font-family: var(--font-serif); }
 .pool-obj__tip--below { bottom: auto; top: calc(var(--r) + 40px); }
 .pool__wipe { background: radial-gradient(circle at var(--wx, 50%) var(--wy, 50%), #63e0f2, #17b4de 40%, #0a8fc0); }
 
@@ -3353,4 +3365,46 @@ h3, h4 { font-family: var(--font-body); font-weight: 700; letter-spacing: -0.008
 @media (max-width: 560px) {
   .life-grid { grid-template-columns: 1fr; }
   .life-hero { padding-top: calc(var(--header-h) + 44px); }
+}
+
+/* ========================================================================
+   V11 — Special Elite for reading
+   One weight and no italic, a wide set and a strong texture: it runs a little
+   smaller than a book face, with more leading and tighter word spaces.
+   ======================================================================== */
+body { font-size: 16px; line-height: 1.72; word-spacing: -0.08em; }
+strong, b { font-synthesis: weight; }
+em { font-synthesis: style; }
+h1 em, h2 em { font-synthesis: none; }
+h1, h2, h3, h4, .nav, .btn, .brand { word-spacing: normal; }
+.mock { font-family: var(--font-serif); word-spacing: normal; }
+.prose { font-size: 16px; line-height: 1.78; }
+.prose p { margin-bottom: 1.2em; }
+.about-v6__story-copy { font-size: 16px; line-height: 1.82; }
+.about-v6__story-copy p { margin-bottom: 1.25em; }
+.about-v6__story-copy a { font-weight: 400; text-decoration-thickness: 2px; }
+.about-v6__intro, .about-v6__closing p:last-child, .about-v6__principles-heading > p:last-child { font-size: 16px; line-height: 1.72; }
+.page-top .lead { font-size: clamp(16px, 1.5vw, 18px); line-height: 1.72; max-width: 60ch; }
+.card__summary { font-size: 15px; line-height: 1.62; }
+.card--featured .card__summary { font-size: 16.5px; line-height: 1.62; }
+.about-v6__education-entry p { font: 400 13.5px/1.55 var(--font-body); }
+.about-v6__education-award { font: 400 13px/1.5 var(--font-body); }
+.about-v6__path p { font-size: 13.5px; line-height: 1.68; }
+.about-v6__path small { font-size: 12.5px; }
+.about-v6__principle-grid article p { font-size: 14.5px; line-height: 1.68; }
+.strength-evidence { font-size: 13.5px; }
+.sheet__facts dd { font-size: 14.5px; line-height: 1.58; }
+.sheet__limits { font-size: 13px; line-height: 1.6; }
+.atc2__stages p, .atc2__features { font-size: 13.5px; line-height: 1.56; }
+.atc2__features strong { font-size: 14px; }
+.decisions p, .limits { font-size: 15px; line-height: 1.68; }
+.testimonial blockquote { font-size: clamp(17px, 1.8vw, 22px); line-height: 1.62; letter-spacing: 0; }
+.atc2__proof .testimonial blockquote { font-size: 13.5px; line-height: 1.55; }
+.life-card p:not(.life-card__line) { font-size: 15px; line-height: 1.68; }
+.about-v6__life-note p { font-size: 15px; }
+.contact-block__note { font-size: 14.5px; line-height: 1.62; }
+.site-footer { font-size: 13px; }
+@media (max-width: 600px) {
+  body, .prose, .about-v6__story-copy { font-size: 15.5px; }
+  .about-v6__intro, .about-v6__closing p:last-child { font-size: 15.5px; }
 }

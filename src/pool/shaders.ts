@@ -23,19 +23,22 @@ interface Wave {
 }
 
 /**
- * Wind waves from long swell to fine chop, fanned out by the golden angle so
- * no two line up. Evaluated on the GPU (all of them) for the surface normal and
- * on the CPU (the long ones) so the floats ride the waves the water is showing.
+ * Wind waves, fanned out by the golden angle so no two line up. Energy sits in
+ * the long and middle waves: those shape broad, irregular patches of light,
+ * where short waves would draw a thin bright web. Fine surface detail comes from
+ * `rippleTex` instead, which never reaches the caustics. Evaluated on the GPU
+ * (all of them) for the surface normal and on the CPU (the long ones) so the
+ * floats ride the waves the water is showing.
  */
-export const WAVES: Wave[] = Array.from({ length: 9 }, (_, i) => {
-  const wavelength = 1.42 * Math.pow(0.725, i);
+export const WAVES: Wave[] = Array.from({ length: 7 }, (_, i) => {
+  const wavelength = 1.7 * Math.pow(0.74, i);
   const k = (2 * Math.PI) / wavelength;
   const angle = 0.7 + i * 2.39996;
-  return { kx: Math.cos(angle) * k, kz: Math.sin(angle) * k, slope: 0.0165 * Math.pow(0.97, i), omega: Math.sqrt(k) * 1.02, phase: i * 1.91 };
+  return { kx: Math.cos(angle) * k, kz: Math.sin(angle) * k, slope: 0.024 * Math.pow(0.84, i), omega: Math.sqrt(k) * 0.78, phase: i * 1.91 };
 });
 
 /** Waves long enough to move a float. Short chop averages out under a hull. */
-const SWELL = WAVES.slice(0, 4);
+const SWELL = WAVES.slice(0, 3);
 
 /** Surface height and slope of the swell at a world point (CPU side). */
 export function swellAt(x: number, z: number, t: number) {
@@ -69,6 +72,40 @@ ${WAVES.map(
   return s;
 }
 `;
+
+/**
+ * Tiling slope map for fine surface detail, built from random waves with whole
+ * cycles per tile. Two scrolling samples of it give the water a living surface
+ * at fragment rate, with a fixed cost however large the pool is on screen.
+ */
+export function buildRippleMap(size: number) {
+  let seed = 7;
+  const random = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const waves = Array.from({ length: 26 }, () => {
+    const cycles = 2 + Math.floor(random() * random() * 22);
+    const angle = random() * Math.PI * 2;
+    const fx = Math.round(Math.cos(angle) * cycles);
+    const fz = Math.round(Math.sin(angle) * cycles);
+    return { fx, fz, phase: random() * Math.PI * 2, amp: 1 / (2 + cycles * 0.45) };
+  });
+  const data = new Uint8Array(size * size * 4);
+  const tau = (Math.PI * 2) / size;
+  for (let z = 0, i = 0; z < size; z++) {
+    for (let x = 0; x < size; x++, i += 4) {
+      let sx = 0;
+      let sz = 0;
+      for (const w of waves) {
+        const c = w.amp * Math.cos((w.fx * x + w.fz * z) * tau + w.phase);
+        sx += c * w.fx * 0.06;
+        sz += c * w.fz * 0.06;
+      }
+      data[i] = Math.max(0, Math.min(255, 127.5 + sx * 90));
+      data[i + 1] = Math.max(0, Math.min(255, 127.5 + sz * 90));
+      data[i + 3] = 255;
+    }
+  }
+  return data;
+}
 
 export const fullscreenVert = /* glsl */ `
 varying vec2 vUv;
@@ -123,6 +160,20 @@ void main() {
   info.r += info.g;
   info.r *= 0.9993; // slow relaxation back to a flat surface
   gl_FragColor = info;
+}
+`;
+
+/** Softens the caustic map: sunlight through water has no hard edges. */
+export const blurFrag = /* glsl */ `
+precision highp float;
+uniform sampler2D tex;
+uniform vec2 direction;
+varying vec2 vUv;
+void main() {
+  vec4 c = texture2D(tex, vUv) * 0.227027;
+  c += (texture2D(tex, vUv + direction * 1.384615) + texture2D(tex, vUv - direction * 1.384615)) * 0.316216;
+  c += (texture2D(tex, vUv + direction * 3.230769) + texture2D(tex, vUv - direction * 3.230769)) * 0.070270;
+  gl_FragColor = c;
 }
 `;
 
@@ -199,16 +250,16 @@ vec3 floorTiles(vec2 p) {
   vec2 c = p / size;
   vec2 id = floor(c);
   float v = hash12(id);
-  vec3 tile = vec3(0.50, 0.87, 0.94) * (0.955 + 0.075 * v);
+  vec3 tile = vec3(0.66, 0.91, 0.965) * (0.97 + 0.05 * v);
   // Lane rectangle with crossing ends (reference: two long lanes joined by
   // two short ones, each line running one tile past the corner).
-  float lw = 0.042;
+  float lw = 0.05;
   // Portrait opens the lanes out so the name sits between them.
   float zl = portraitMode > 0.5 ? 0.86 : 0.66, xl = 1.26;
   float hLine = step(abs(abs(p.y) - zl), lw) * step(abs(p.x), xl + 0.16);
   float vLine = step(abs(abs(p.x) - xl), lw) * step(abs(p.y), zl + 0.16);
   float lane = max(hLine, vLine);
-  tile = mix(tile, vec3(0.05, 0.36, 0.80) * (0.96 + 0.07 * v), lane * 0.95);
+  tile = mix(tile, vec3(0.09, 0.33, 0.68) * (0.97 + 0.06 * v), lane * 0.9);
   // UV for the identity on the tiled floor, not above the water. Portrait
   // rotates the print to follow the camera, while retaining refraction.
   vec2 oriented = portraitMode > 0.5
@@ -218,29 +269,22 @@ vec3 floorTiles(vec2 p) {
     : vec2(p.x / halfSize.x, -p.y / halfSize.y);
   vec4 ink = texture2D(floorTypeTex, oriented * 0.5 + 0.5);
   // Printed before the grout so the lettering reads as inlaid mosaic.
-  tile = mix(tile, vec3(0.02, 0.16, 0.50), ink.a * 0.97);
-  return mix(tile, vec3(0.70, 0.93, 0.96), grout(c, 0.03) * (1.0 - ink.a * 0.55));
+  tile = mix(tile, vec3(0.03, 0.21, 0.52), ink.a * 0.96);
+  return mix(tile, vec3(0.80, 0.95, 0.975), grout(c, 0.022) * (1.0 - ink.a * 0.6) * 0.75);
 }
 
 vec3 wallTiles(vec2 c2, float y) {
-  // Waterline band of small teal mosaic just below the rim.
-  if (y > -0.035) {
-    vec2 c = c2 / 0.0375;
-    float v = hash12(floor(c));
-    vec3 m = mix(vec3(0.05, 0.56, 0.74), vec3(0.20, 0.74, 0.86), v);
-    return mix(m, vec3(0.86, 0.97, 0.98), grout(c, 0.055));
-  }
   vec2 c = c2 / 0.1;
   float v = hash12(floor(c) + 17.0);
-  vec3 tile = vec3(0.54, 0.88, 0.95) * (0.96 + 0.07 * v);
-  return mix(tile, vec3(0.72, 0.93, 0.96), grout(c, 0.032));
+  vec3 tile = vec3(0.60, 0.89, 0.96) * (0.97 + 0.05 * v);
+  return mix(tile, vec3(0.80, 0.95, 0.975), grout(c, 0.026) * 0.75);
 }
 
 // Soft silhouette shadow of the floats, projected along the refracted sun.
 float objectShadow(vec2 q) {
   vec2 uv = q / halfSize * 0.5 + 0.5;
   float edge = min(min(uv.x, 1.0 - uv.x), min(uv.y, 1.0 - uv.y));
-  return 1.0 - 0.72 * texture2D(shadowTex, clamp(uv, 0.0, 1.0)).r * smoothstep(0.0, 0.015, edge);
+  return 1.0 - 0.55 * texture2D(shadowTex, clamp(uv, 0.0, 1.0)).r * smoothstep(0.0, 0.015, edge);
 }
 
 vec3 faceNormal(vec3 p) {
@@ -269,7 +313,8 @@ vec3 poolSurface(vec3 p, bool underwater) {
     ao *= mix(0.91, 1.0, smoothstep(0.0, 0.12, along));
   }
 
-  if (!underwater) return base * (0.95 + 0.25 * max(0.0, dot(light, n))) * ao;
+  // Above the water the walls are the pale stone of the coping.
+  if (!underwater) return vec3(0.97, 0.94, 0.88) * (0.8 + 0.3 * max(0.0, dot(light, n)));
 
   vec3 rl = -refract(-light, vec3(0.0, 1.0, 0.0), IOR_AIR / IOR_WATER);
   float facing = max(0.0, dot(rl, n));
@@ -279,21 +324,27 @@ vec3 poolSurface(vec3 p, bool underwater) {
   float t = (p.y + depth) / rl.y;
   vec2 q = p.xz - rl.xz * t;
   vec2 cuv = q / halfSize * 0.5 + 0.5;
-  vec2 spread = normalize(rl.xz + 1e-4) * 0.0019;
+  vec2 spread = normalize(rl.xz + 1e-4) * 0.0028;
   // Water disperses a little: split the focus lines by wavelength.
   vec3 focus = vec3(
     texture2D(causticTex, clamp(cuv + spread, 0.0, 1.0)).r,
     texture2D(causticTex, clamp(cuv, 0.0, 1.0)).r,
     texture2D(causticTex, clamp(cuv - spread, 0.0, 1.0)).r
   ) * 4.0;
-  float blocked = objectShadow(q) * (1.0 - 0.62 * texture2D(leafTex, leafUv(q)).r);
-  // Walls catch the same light at a glancing angle, so its focus is smeared.
-  if (n.y < 0.5) focus = mix(vec3(1.0), focus, 0.4) * (0.55 + 0.45 * facing);
-  vec3 sun = vec3(1.0, 0.985, 0.94) * focus * blocked;
-  vec3 lit = vec3(0.70, 0.76, 0.78) + sun * 0.34;
-  // Hot focus lines burn through the tile colour towards white.
-  vec3 glow = vec3(0.90, 1.0, 1.0) * max(sun.g - 1.6, 0.0) * 0.1;
-  return base * lit * ao + glow;
+  // Light comes and goes in patches as the longer swell passes over.
+  float drift = sin(q.x * 1.7 + q.y * 0.9 + poolTime * 0.11) * sin(q.y * 2.3 - q.x * 0.7 - poolTime * 0.09);
+  float strength = 0.62 + 0.38 * smoothstep(-0.7, 0.7, drift);
+  focus = max(mix(min(focus, vec3(1.0)), focus, strength), vec3(0.0));
+  // Roll off the peaks like a camera does, so focus never clips to neon.
+  focus = focus * 1.28 / (1.0 + 0.28 * focus);
+  float object = objectShadow(q);
+  float blocked = object * (1.0 - 0.6 * texture2D(leafTex, leafUv(q)).r);
+  if (n.y < 0.5) focus = mix(vec3(1.0), focus, 0.35) * (0.6 + 0.4 * facing);
+  vec3 sun = vec3(1.0, 0.985, 0.95) * focus * blocked;
+  vec3 lit = vec3(0.68, 0.74, 0.78) * mix(0.82, 1.0, object) + sun * 0.33;
+  // Where the light is most concentrated it lifts towards white, softly.
+  vec3 bloom = vec3(0.92, 1.0, 1.0) * smoothstep(1.25, 2.3, sun.g) * 0.13;
+  return base * lit * ao + bloom;
 }
 `;
 
@@ -358,6 +409,7 @@ ${poolCommon}
 uniform sampler2D water;
 uniform sampler2D footprintTex; // sharp hulls at the waterline: rgb colour, a coverage
 uniform sampler2D contactTex;   // the same map, blurred
+uniform sampler2D rippleTex;    // tiling fine surface slopes
 uniform vec3 sunDir;
 uniform vec3 absorb;
 uniform vec3 deepColor;
@@ -366,18 +418,11 @@ varying vec3 vPos;
 
 vec3 sky(vec3 r) {
   float up = clamp(r.y, 0.0, 1.0);
-  vec3 c = mix(vec3(0.86, 0.95, 1.0), vec3(0.42, 0.72, 0.98), pow(up, 0.65));
+  vec3 c = mix(vec3(0.93, 0.97, 1.0), vec3(0.55, 0.80, 0.99), pow(up, 0.7));
   // Two soft fair-weather clouds, enough to break up the reflection.
   vec2 s = r.xz / max(r.y, 0.12);
-  float cloud = sin(s.x * 3.1 + 1.0) * sin(s.y * 2.7 - 0.6) + 0.5 * sin(s.x * 7.3 - s.y * 5.1);
-  return mix(c, vec3(1.0), smoothstep(0.35, 1.2, cloud) * 0.55);
-}
-
-// A fine fragment-rate shimmer, finer than the simulation grid can hold.
-vec2 chop(vec2 p, float t) {
-  vec2 a = vec2(p.x * 37.0 + p.y * 19.0 + t * 1.7, p.y * 41.0 - p.x * 13.0 - t * 1.4);
-  vec2 b = vec2(p.x * 71.0 - p.y * 53.0 - t * 2.3, p.y * 67.0 + p.x * 47.0 + t * 2.0);
-  return 0.035 * cos(a) + 0.03 * cos(b);
+  float cloud = sin(s.x * 2.3 + 1.0) * sin(s.y * 1.9 - 0.6) + 0.5 * sin(s.x * 5.3 - s.y * 3.1);
+  return mix(c, vec3(1.0), smoothstep(0.2, 1.1, cloud) * 0.6);
 }
 
 void main() {
@@ -395,24 +440,34 @@ void main() {
   );
   slope -= lift * 0.55;
 
-  vec3 normal = normalize(vec3(slope.x, 1.0, slope.y));
+  // Fine surface detail: two layers drifting across each other. It ruffles the
+  // reflections and glitter, and barely touches the view of the floor.
+  vec2 q = vPos.xz;
+  vec2 fine = (texture2D(rippleTex, q * 0.61 + time * vec2(0.021, 0.013)).rg
+             + texture2D(rippleTex, q.yx * 1.13 - time * vec2(0.016, 0.027)).gr - 1.0) * 0.12;
+
+  vec3 normal = normalize(vec3(slope.x + fine.x, 1.0, slope.y + fine.y));
   vec3 incoming = normalize(vPos - cameraPosition);
   vec3 refl = reflect(incoming, normal);
   // Looking down through the water the view bends less than the light does, so
   // the caustics stay lively while the name on the floor stays readable.
-  vec3 refr = refract(incoming, normalize(vec3(slope.x * 0.62, 1.0, slope.y * 0.62)), IOR_AIR / IOR_WATER);
+  vec2 bend = slope * 0.62 + fine * 0.08;
+  vec3 refr = refract(incoming, normalize(vec3(bend.x, 1.0, bend.y)), IOR_AIR / IOR_WATER);
 
   vec2 t = intersectBox(vPos, refr, vec3(-halfSize.x, -depth, -halfSize.y), vec3(halfSize.x, rimH + 1.0, halfSize.y));
   float dist = t.y;
   vec3 col = poolSurface(vPos + refr * dist, true);
 
-  // The hull below the waterline, seen through the moving surface.
-  float hullDepth = 0.045;
-  vec2 hullUv = (vPos.xz + refr.xz * ((hullDepth + vPos.y) / max(-refr.y, 0.05))) / halfSize * 0.5 + 0.5;
-  vec4 hull = texture2D(footprintTex, hullUv);
-  if (hull.a > 0.003) {
-    vec3 tinted = mix(hull.rgb / hull.a, vec3(0.30, 0.82, 0.92), 0.42) * 0.92;
-    col = mix(col, tinted, hull.a * 0.86);
+  // The hull below the waterline, seen through the moving surface: a shallow
+  // sample for its flank and a deeper one for its belly.
+  for (int i = 0; i < 2; i++) {
+    float hullDepth = i == 0 ? 0.075 : 0.03;
+    vec2 hullUv = (vPos.xz + refr.xz * ((hullDepth + vPos.y) / max(-refr.y, 0.05))) / halfSize * 0.5 + 0.5;
+    vec4 hull = texture2D(footprintTex, hullUv);
+    if (hull.a > 0.003) {
+      vec3 tinted = mix(hull.rgb / hull.a, col, i == 0 ? 0.68 : 0.46) * 0.9;
+      col = mix(col, tinted, hull.a * 0.9);
+    }
   }
 
   col *= exp(-dist * absorb);
@@ -422,10 +477,10 @@ void main() {
   // bright meniscus. Both fade out a short way from the hull.
   float crease = smoothstep(0.34, 0.92, near);
   float ring = smoothstep(0.02, 0.2, near) * (1.0 - smoothstep(0.2, 0.5, near));
-  col *= 1.0 - crease * 0.58;
+  col *= 1.0 - crease * 0.5;
 
   float cosT = max(0.0, dot(normal, -incoming));
-  float fresnel = 0.022 + 0.978 * pow(1.0 - cosT, 5.0);
+  float fresnel = 0.03 + 0.97 * pow(1.0 - cosT, 5.0);
   vec3 reflected = sky(refl);
   // The floats colour the water beside them.
   vec2 mirrorUv = uv + refl.xz * 0.05;
@@ -434,17 +489,16 @@ void main() {
   float mirrorGain = 1.0 + mirror.a * 5.0;
   vec3 c = mix(col, reflected, clamp(fresnel * mirrorGain, 0.0, 1.0));
 
-  // Sun glitter: only the small facets tilted exactly towards the eye light up.
-  vec2 shimmer = chop(vPos.xz, time);
-  vec3 faceted = normalize(normal + vec3(shimmer.x, 0.0, shimmer.y));
-  float sparkle = pow(max(dot(reflect(incoming, faceted), sunDir), 0.0), 2400.0);
+  // Sun glitter: small, scattered, and only where a facet faces the sun.
+  vec3 faceted = normalize(vec3(slope.x + fine.x * 3.4, 1.0, slope.y + fine.y * 3.4));
+  float sparkle = pow(max(dot(reflect(incoming, faceted), sunDir), 0.0), 2600.0);
   float leaf = 1.0 - 0.8 * texture2D(leafTex, leafUv(vPos.xz)).r;
-  c += vec3(1.0, 0.99, 0.95) * min(sparkle * 1.6, 0.9) * leaf * (1.0 - crease);
-  c += vec3(0.86, 0.97, 0.98) * ring * 0.2 * (0.7 + 0.3 * sin(time * 0.9 + vPos.x * 9.0 + vPos.z * 7.0));
+  c += vec3(1.0, 0.99, 0.95) * min(sparkle * 0.9, 0.5) * leaf * (1.0 - crease);
+  c += vec3(0.88, 0.97, 0.98) * ring * 0.05;
 
   // Soft darkening where the water meets the wall (rim shadow / meniscus).
   float dw = min(halfSize.x - abs(vPos.x), halfSize.y - abs(vPos.z));
-  c *= mix(0.9, 1.0, smoothstep(0.0, 0.03, dw));
+  c *= mix(0.8, 1.0, smoothstep(0.0, 0.035, dw));
 
   gl_FragColor = vec4(c, 1.0);
 }
@@ -490,39 +544,43 @@ void main() {
   float e = max(o.x, o.y); // signed distance-ish to the pool opening (outside > 0)
   if (e < 0.0) discard;
 
-  // Large warm off-white tiles, offset so grout lines meet the coping cleanly.
-  vec2 c = (p - halfSize - coping) / 0.25;
+  // Large warm stone pavers, offset so joints meet the coping cleanly.
+  vec2 c = (p - halfSize - coping) / 0.42;
   vec2 g = abs(fract(c) - 0.5);
   float edge = 0.5 - max(g.x, g.y);
   float aa = max(fwidth(c.x), fwidth(c.y)) * 1.2;
-  float gr = 1.0 - smoothstep(0.012, 0.012 + aa, edge);
+  float gr = 1.0 - smoothstep(0.008, 0.008 + aa, edge);
   float v = hash12(floor(c));
-  vec3 tile = vec3(0.955, 0.945, 0.92) * (0.99 + 0.02 * v);
-  vec3 col = mix(tile, vec3(0.88, 0.88, 0.86), gr);
+  vec3 tile = vec3(0.985, 0.945, 0.875) * (0.975 + 0.04 * v);
+  vec3 col = mix(tile, vec3(0.90, 0.85, 0.77), gr);
 
   // Coping stones around the opening: brighter, with a rounded bullnose edge.
   if (e < coping) {
-    vec3 cop = vec3(0.99, 0.977, 0.95);
-    float bull = smoothstep(0.0, 0.03, e);
-    cop *= mix(0.80, 1.0, bull);
-    // Joints in the coping every 0.4
+    vec3 cop = vec3(1.0, 0.975, 0.925);
+    float bull = smoothstep(0.0, 0.035, e);
+    cop *= mix(0.74, 1.0, bull);
     float along = o.x > o.y ? p.y : p.x;
-    float j = abs(fract(along / 0.4) - 0.5);
-    float jaa = fwidth(along / 0.4) * 1.5;
-    cop = mix(cop, vec3(0.88, 0.86, 0.82), 1.0 - smoothstep(0.004, 0.004 + jaa, 0.5 - j));
+    float j = abs(fract(along / 0.46) - 0.5);
+    float jaa = fwidth(along / 0.46) * 1.5;
+    cop = mix(cop, vec3(0.86, 0.81, 0.73), 1.0 - smoothstep(0.004, 0.004 + jaa, 0.5 - j));
     col = cop;
   } else {
     // Contact shadow cast by the coping lip onto the deck.
-    col *= mix(0.93, 1.0, smoothstep(coping, coping + 0.05, e));
+    col *= mix(0.9, 1.0, smoothstep(coping, coping + 0.05, e));
   }
 
-  // Sun-warmed stone, with the foliage overhead dappling it.
-  col *= vec3(1.0, 0.985, 0.955);
-  col *= mix(vec3(1.0), vec3(0.70, 0.76, 0.86), texture2D(leafTex, leafUv(p)).r * 0.92);
+  // Foliage overhead dapples the sunlit stone; shade stays warm, never grey.
+  vec2 luv = leafUv(p);
+  float shade = 0.0;
+  for (int i = 0; i < 4; i++) {
+    float a = float(i) * 1.5708 + 0.6;
+    shade += texture2D(leafTex, luv + vec2(cos(a), sin(a)) * 0.0026).r;
+  }
+  col *= mix(vec3(1.0), vec3(0.64, 0.58, 0.57), shade * 0.25);
 
   // Gentle falloff toward the edges of the deck.
   float r = length(p / (halfSize + 1.4));
-  col *= mix(1.0, 0.975, smoothstep(0.8, 1.5, r));
+  col *= mix(1.0, 0.96, smoothstep(0.8, 1.5, r));
   // Fine grain so flat colour doesn't band.
   col += (hash12(p * 431.0) - 0.5) * 0.012;
   gl_FragColor = vec4(col, 1.0);
