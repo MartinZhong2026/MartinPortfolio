@@ -1,37 +1,14 @@
 import { filterLabels, projects } from '../data/projects';
 import { site } from '../data/site';
-import { career, strengths, hikingRegions, lifePhotos } from '../data/about';
+import { career, strengths, hikingRegions, lifeActivities, lifePhotos } from '../data/about';
 import { ProjectCard } from '../components/ProjectCard';
 
 /* ----------------------------------------------------------------- HOME */
 export function Home({ islandHtml }: { islandHtml: string }) {
   return (
-    <>
-      <section className="home-stage" aria-label="Interactive pool">
-        <div id="pool-island" dangerouslySetInnerHTML={{ __html: islandHtml }} />
-      </section>
-      <div className="about-v6 home-flow">
-        <AboutHero onHome />
-        <AboutStory />
-        <section className="home-work" id="projects" aria-labelledby="projects-h">
-          <div className="wrap">
-            <div className="home-work__head" data-reveal>
-              <p className="about-v6__section-label"><span>02</span> / Selected work</p>
-              <h2 id="projects-h">Five projects. <em>One question:</em> does this actually help someone?</h2>
-            </div>
-            <ul className="cards">
-              {projects.map((p) => (
-                <li key={p.slug} style={p.featured ? { gridColumn: '1 / -1' } : undefined} data-reveal>
-                  <ProjectCard project={p} />
-                </li>
-              ))}
-            </ul>
-          </div>
-        </section>
-        <AboutLife />
-        <AboutClosing />
-      </div>
-    </>
+    <section className="home-stage" aria-label="Interactive pool">
+      <div id="pool-island" dangerouslySetInnerHTML={{ __html: islandHtml }} />
+    </section>
   );
 }
 
@@ -43,6 +20,7 @@ export function Work() {
         <div className="wrap">
           <p className="eyebrow">Work</p>
           <h1>Selected work</h1>
+          <p className="page-top__question">Five projects. <em>One question:</em> does this actually help someone?</p>
           <p className="lead">
             A collection of products, prototypes, and experiments. One is a live independent venture, another is an
             open-source desktop tool, two grew out of enterprise requirements, and one is an ongoing research
@@ -75,15 +53,14 @@ export function Work() {
 }
 
 /* ---------------------------------------------------------------- ABOUT */
-export function AboutHero({ onHome = false }: { onHome?: boolean }) {
-  const H = onHome ? 'h2' : 'h1';
+export function AboutHero() {
   return (
     <>
       <section className="about-v6__hero" id="about" aria-labelledby="about-v6-title">
         <div className="wrap about-v6__hero-grid">
           <div className="about-v6__hero-heading" data-reveal>
             <p className="about-v6__overline"><span className="about-v6__accent-dot" /> Hello, I'm Martin Zhong <span className="about-v6__overline-line" /> Shanghai, China</p>
-            <H id="about-v6-title">Hi!<br />I am <em>Martin Zhong.</em></H>
+            <h1 id="about-v6-title">Hi!<br />I am <em>Martin Zhong.</em></h1>
           </div>
           <figure className="about-v6__hero-portrait" data-reveal>
             <div className="about-v6__portrait-frame">
@@ -118,7 +95,7 @@ export function AboutHero({ onHome = false }: { onHome?: boolean }) {
               <p className="about-v6__ranking-note">Rankings: QS World University Rankings 2027 · University-wide, not subject-specific.</p>
             </div>
             <div className="about-v6__actions">
-              <a className="btn btn--ink" href={onHome ? "#projects" : "/work/"}>Explore selected work <span aria-hidden="true">{onHome ? "↓" : "↗"}</span></a>
+              <a className="btn btn--ink" href="/work/">Explore selected work <span aria-hidden="true">↗</span></a>
               <a className="about-v6__text-link" href="#my-story">Get to know me <span aria-hidden="true">↓</span></a>
               {site.contact.resume && <a className="about-v6__text-link" href={site.contact.resume}>Résumé <span aria-hidden="true">↗</span></a>}
             </div>
@@ -237,41 +214,13 @@ export function AboutStrengths() {
   );
 }
 
-export function AboutLife() {
-  return (
-    <>
-      <section id="outside" className="about-v6__life wrap" aria-labelledby="about-v6-life">
-        <div className="about-v6__life-head" data-reveal>
-          <div><p className="about-v6__section-label"><span>03</span> / Outside the screen</p><h2 id="about-v6-life">A little more <em>human.</em></h2></div>
-          <p>
-            Running gives me rhythm. Hiking takes me somewhere unfamiliar. Drawing makes me pay attention.
-            Life outside work is where I recharge and find new perspectives.
-          </p>
-        </div>
-
-        <div className="about-v6__gallery about-v6__gallery--approved">
-          {lifePhotos.filter(photo => photo.publicOk).map(photo => <figure key={photo.src} className={`about-v6__photo about-v6__photo--${photo.className}`} data-reveal>
-            <img src={photo.src} width={photo.width} height={photo.height} alt={photo.alt} loading="lazy" />
-            <figcaption><span>{photo.title}</span></figcaption>
-          </figure>)}
-        </div>
-        <div className="about-v6__life-note" data-reveal>
-          <p><strong>Trails across {hikingRegions.length} provinces & regions.</strong> I also enjoy strength training and the feeling of being a beginner somewhere unfamiliar.</p>
-          <ul className="region-chips" aria-label="Places I have hiked">{hikingRegions.map(region => <li key={region}>{region}</li>)}</ul>
-        </div>
-      </section>
-
-    </>
-  );
-}
-
 export function AboutClosing() {
   return (
     <>
       <section className="about-v6__closing" aria-labelledby="about-v6-closing">
         <div className="wrap about-v6__closing-inner">
           <div>
-            <p className="about-v6__section-label"><span>04</span> / What's next</p>
+            <p className="about-v6__section-label"><span>03</span> / What's next</p>
             <h2 id="about-v6-closing">Good questions deserve<br /><em>useful answers.</em></h2>
             {site.lookingFor.roles && <p>I’m interested in {site.lookingFor.roles}.</p>}
             {site.lookingFor.locations && <p className="looking-for">{site.lookingFor.locations}</p>}
@@ -304,8 +253,59 @@ export function About() {
       <AboutProof />
       <AboutStory />
       <AboutStrengths />
-      <AboutLife />
       <AboutClosing />
+    </div>
+  );
+}
+
+/* ----------------------------------------------------------------- LIFE */
+export function Life() {
+  return (
+    <div className="about-v6 life">
+      <header className="life-hero">
+        <div className="wrap">
+          <p className="about-v6__overline"><span className="about-v6__accent-dot" /> Outside the screen</p>
+          <h1>A little more <em>human.</em></h1>
+          <p className="life-hero__lead">Life outside work is where I recharge and find new perspectives.</p>
+          <nav className="life-hero__jump" aria-label="On this page">
+            {lifeActivities.map((a) => <a key={a.id} href={`#${a.id}`}>{a.title}</a>)}
+            <a href="#gallery">Gallery</a>
+          </nav>
+        </div>
+      </header>
+
+      <section className="wrap life-grid" aria-label="What I do outside work">
+        {lifeActivities.map((a, i) => (
+          <article key={a.id} id={a.id} className="life-card" data-reveal>
+            <span className="life-card__index">0{i + 1}</span>
+            <h2>{a.title}</h2>
+            <p className="life-card__line">{a.line}</p>
+            {a.notes.map((note) => <p key={note}>{note}</p>)}
+            {a.id === 'hiking' && (
+              <ul className="region-chips" aria-label="Places I have hiked">{hikingRegions.map((region) => <li key={region}>{region}</li>)}</ul>
+            )}
+          </article>
+        ))}
+      </section>
+
+      <section id="gallery" className="about-v6__life wrap" aria-labelledby="life-gallery">
+        <div className="about-v6__life-head" data-reveal>
+          <div>
+            <p className="about-v6__section-label"><span>05</span> / Photo gallery</p>
+            <h2 id="life-gallery">Out and <em>about.</em></h2>
+          </div>
+        </div>
+        <div className="about-v6__gallery about-v6__gallery--approved">
+          {lifePhotos.filter(photo => photo.publicOk).map(photo => <figure key={photo.src} className={`about-v6__photo about-v6__photo--${photo.className}`} data-reveal>
+            <img src={photo.src} width={photo.width} height={photo.height} alt={photo.alt} loading="lazy" />
+            <figcaption><span>{photo.title}</span></figcaption>
+          </figure>)}
+        </div>
+        <div className="life-next">
+          <a className="btn btn--ink" href="/work/">See the work <span aria-hidden="true">↗</span></a>
+          <a className="btn btn--ghost" href="/">Back to the pool</a>
+        </div>
+      </section>
     </div>
   );
 }

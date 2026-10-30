@@ -18,4 +18,10 @@ export const lifePhotos = [
   { src: '/assets/about/shanghai-run-group.jpg', width: 1536, height: 1152, title: 'Running together', detail: null, alt: 'A running group at the Shanghai waterfront.', className: 'wide', publicOk: true }, // User-requested About gallery; confirm group-photo permission before public deployment.
   { src: '/assets/about/hiking-group.jpg', width: 1536, height: 1152, title: 'On the trail', detail: null, alt: 'A hiking group in a mountain valley.', className: 'hiking', publicOk: true }, // User-requested About gallery; confirm group-photo permission before public deployment.
 ];
+export const lifeActivities = [
+  { id: 'running', title: 'Running', line: 'Running gives me rhythm.', notes: ['Running in Shanghai, one city route at a time.', 'A race, a medal, and a reason to keep running.'] },
+  { id: 'fitness', title: 'Fitness', line: 'I also enjoy strength training.', notes: [] },
+  { id: 'hiking', title: 'Hiking', line: 'Hiking takes me somewhere unfamiliar.', notes: [`Trails across ${hikingRegions.length} provinces & regions, and the feeling of being a beginner somewhere unfamiliar.`] },
+  { id: 'drawing', title: 'Drawing', line: 'Drawing makes me pay attention.', notes: ['My own pen sketch of Hong Kong. A way to look a little longer.'] },
+];
 export const poolMetaphor = null as string | null; // TODO(Martin): approve “Learning a new place, with a little support.”

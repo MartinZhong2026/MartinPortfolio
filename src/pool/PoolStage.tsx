@@ -5,14 +5,6 @@ import { landscapeLayout, portraitLayout, type PoolObjectId } from './layout';
 import type { PoolEngine } from './PoolEngine';
 import { placeLabel, type LabelBox } from './labels';
 
-const fallbackArt: Partial<Record<PoolObjectId, { file: string; width: number; height: number }>> = {
-  'adapt-to-china': { file: 'adapt-to-china', width: 410, height: 316 },
-  meetfolio: { file: 'meetfolio', width: 98, height: 114 },
-  abtrace: { file: 'abtrace', width: 142, height: 127 },
-  'supplier-document-intelligence': { file: 'document-ai', width: 183, height: 171 },
-  fanscope: { file: 'fanscope', width: 138, height: 132 },
-};
-
 type Mode = 'static' | 'loading' | 'live' | 'unsupported';
 
 interface PoolItem {
@@ -22,6 +14,8 @@ interface PoolItem {
   caption: string;
   status?: string;
   flagship?: boolean;
+  /** A page rather than a project: the boat and the ring. */
+  place?: boolean;
 }
 
 export const poolItems: PoolItem[] = [
@@ -29,10 +23,12 @@ export const poolItems: PoolItem[] = [
     id: p.slug as PoolObjectId,
     href: `/work/${p.slug}/`,
     label: p.poolLabel,
-    caption: `${p.caption} ${p.objectName}.`,
+    caption: p.caption,
     status: p.status,
     flagship: p.featured,
   })),
+  { id: 'about', href: '/about/', label: 'About', caption: 'Who I am, how I got here, and how to reach me.', place: true },
+  { id: 'life', href: '/life/', label: 'Life', caption: 'Running, fitness, hiking, drawing, and a photo gallery.', place: true },
 ];
 
 /**
@@ -89,7 +85,14 @@ export function PoolStage() {
             const ox = fr.left - cr.left;
             const oy = fr.top - cr.top;
             const placed: LabelBox[] = [];
-            const avoided: LabelBox[] = [];
+            // Keep labels off the floats and off the name on the pool floor.
+            const avoided: LabelBox[] = [...anchors.values()].map((a) => {
+              const r = a.r * 0.82;
+              return { x: a.x - ox - r, y: a.y - oy - r, w: r * 2, h: r * 2 };
+            });
+            const nameW = fr.width * (fr.height > fr.width ? 0.76 : 0.56);
+            const nameH = fr.height * (fr.height > fr.width ? 0.17 : 0.3);
+            avoided.push({ x: (fr.width - nameW) / 2, y: (fr.height - nameH) / 2, w: nameW, h: nameH });
             // Batch layout reads before per-label style writes.
             const dimensions = new Map([...linkRefs.current].map(([id, el]) => {
               const label = el.querySelector<HTMLElement>('.pool-obj__label');
@@ -107,7 +110,11 @@ export function PoolStage() {
                 label.style.left = `${box.x + box.w / 2 - x}px`;
                 label.style.top = `${box.y - y}px`;
                 const tip = el.querySelector<HTMLElement>('.pool-obj__tip');
-                if (tip) tip.style.left = `${Math.max(110, Math.min(fr.width - 110, x)) - x}px`;
+                if (tip) {
+                  tip.style.left = `${Math.max(110, Math.min(fr.width - 110, x)) - x}px`;
+                  // The top row opens downwards, clear of the page header.
+                  tip.classList.toggle('pool-obj__tip--below', y < fr.height * 0.36);
+                }
               }
             });
           },
@@ -193,18 +200,8 @@ export function PoolStage() {
               <strong>Martin Zhong</strong><span>welcome to my world</span>
             </div>
           </div>
-          <div className="pool__center">
-            <h1 className="sr-only">Martin Zhong — welcome to my world</h1>
-            <div className="pool__center-ctas">
-              <a className="btn btn--ink" href="#projects">
-                Dive into my work <span aria-hidden="true">↓</span>
-              </a>
-              <a className="btn btn--light" href="#about">
-                About me
-              </a>
-            </div>
-          </div>
-          <ul className="pool__objects" aria-label="Projects floating in the pool">
+          <h1 className="sr-only">Martin Zhong — welcome to my world</h1>
+          <ul className="pool__objects" aria-label="Projects and pages floating in the pool">
             {poolItems.map((item) => {
               const l = landscapeLayout[item.id];
               const p = portraitLayout[item.id];
@@ -221,7 +218,7 @@ export function PoolStage() {
                       if (el) linkRefs.current.set(item.id, el);
                     }}
                     href={item.href}
-                    className={`pool-obj${item.flagship ? ' pool-obj--flagship' : ''}${active === item.id ? ' is-active' : ''}${item.id === 'about' ? ' pool-obj--about' : ''}`}
+                    className={`pool-obj${item.flagship ? ' pool-obj--flagship' : ''}${active === item.id ? ' is-active' : ''}${item.place ? ' pool-obj--place' : ''}`}
                     onClick={(e) => onLinkClick(e, item.id)}
                     onFocus={() => setFocus(item.id)}
                     onBlur={() => setFocus(null)}
@@ -229,7 +226,7 @@ export function PoolStage() {
                     onMouseLeave={() => setActive(null)}
                   >
                     <span className="pool-obj__glyph">
-                      {fallbackArt[item.id] ? <img src={`/assets/floats/${fallbackArt[item.id]!.file}.png`} width={fallbackArt[item.id]!.width} height={fallbackArt[item.id]!.height} alt="" /> : <Glyph id={item.id} />}
+                      <Glyph id={item.id} />
                     </span>
                     <span className="pool-obj__label">{item.label}</span>
                     <span className="pool-obj__tip" role="tooltip">
@@ -244,16 +241,16 @@ export function PoolStage() {
         </div>
         <div className="pool__bar">
           <p className="pool__hint">
-            <span className="hint-fine">Nudge the floats with your cursor. Click to explore a project.</span>
-            <span className="hint-coarse">Tap a float to explore. Drag to make a ripple.</span>
+            <span className="hint-fine">Stir the water with your cursor. Click anything floating to explore.</span>
+            <span className="hint-coarse">Tap anything floating to explore. Drag to make a ripple.</span>
           </p>
           <p className="pool__status" role="status" aria-live="polite">
             {mode === 'loading' && 'Getting the pool ready…'}
             {mode === 'unsupported' &&
-              "The interactive pool isn't available on this device. You can still explore every project below."}
+              "The interactive pool isn't available on this device. Every project is still one tap away."}
           </p>
-          <a className="pool__list-link" href="#projects">
-            View projects as a list <span aria-hidden="true">↓</span>
+          <a className="pool__list-link" href="/work/">
+            View projects as a list <span aria-hidden="true">→</span>
           </a>
         </div>
       </div>

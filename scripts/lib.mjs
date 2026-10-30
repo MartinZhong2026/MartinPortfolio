@@ -84,7 +84,8 @@ export async function buildSite({ dev = false, log = true } = {}) {
     let html = renderRoute(route, {
       css: cssFile,
       scripts: [scripts[route.entry]],
-      preload: ['/fonts/source-serif-4.woff'],
+      // The pool letters its floor with Piedra and Geo before first paint.
+      preload: route.entry === 'home' ? ['/fonts/piedra.woff2', '/fonts/geo.woff2'] : ['/fonts/source-serif-4.woff', '/fonts/piedra.woff2'],
     });
     if (dev) html = html.replace('</body>', `<script>${LIVE_RELOAD}</script></body>`);
     const file = join(dist, route.file);

@@ -1,6 +1,6 @@
 import type { ProjectSlug } from '../data/projects';
 
-export type PoolObjectId = ProjectSlug | 'about';
+export type PoolObjectId = ProjectSlug | 'about' | 'life';
 
 /**
  * Object positions in *screen-normalised pool coordinates*:
@@ -18,23 +18,25 @@ export interface Slot {
 }
 
 export const landscapeLayout: Record<PoolObjectId, Slot> = {
-  meetfolio: { sx: -0.48, sy: -0.67, yaw: -0.24, size: 1.0 },
-  abtrace: { sx: 0.60, sy: -0.66, yaw: 0.18, size: 1.0 },
-  fanscope: { sx: 0.77, sy: 0.07, yaw: 0.16, size: 1.0 },
-  'adapt-to-china': { sx: 0.52, sy: 0.66, yaw: -0.10, size: 1.0 },
-  'supplier-document-intelligence': { sx: -0.52, sy: 0.66, yaw: -0.15, size: 1.0 },
-  about: { sx: -0.79, sy: 0.03, yaw: -0.14, size: 1.0 },
+  meetfolio: { sx: -0.42, sy: -0.68, yaw: -0.2, size: 1.0 },
+  abtrace: { sx: 0.42, sy: -0.7, yaw: 0.16, size: 1.0 },
+  fanscope: { sx: 0.84, sy: 0.02, yaw: 0.14, size: 1.0 },
+  'adapt-to-china': { sx: 0.5, sy: 0.66, yaw: -0.1, size: 1.0 },
+  'supplier-document-intelligence': { sx: -0.4, sy: 0.7, yaw: -0.14, size: 1.0 },
+  about: { sx: -0.84, sy: -0.04, yaw: -0.3, size: 1.0 },
+  life: { sx: -0.86, sy: 0.72, yaw: 0, size: 1.0 },
 };
 
-// Labels have their own collision avoidance. At small screens keep all six
+// Labels have their own collision avoidance. At small screens keep all seven
 // objects around a central open stripe for the underwater name.
 export const portraitLayout: Record<PoolObjectId, Slot> = {
-  meetfolio: { sx: -0.51, sy: -0.65, yaw: -0.18, size: 0.86 },
-  abtrace: { sx: 0.50, sy: -0.65, yaw: 0.18, size: 0.86 },
-  fanscope: { sx: 0.52, sy: 0.46, yaw: 0.14, size: 0.86 },
-  'adapt-to-china': { sx: 0.28, sy: 0.78, yaw: 0.08, size: 0.78 },
-  'supplier-document-intelligence': { sx: -0.5, sy: 0.74, yaw: -0.11, size: 0.86 },
-  about: { sx: -0.5, sy: -0.33, yaw: 0.16, size: 0.82 },
+  meetfolio: { sx: -0.5, sy: -0.7, yaw: -0.16, size: 0.98 },
+  abtrace: { sx: 0.48, sy: -0.72, yaw: 0.16, size: 0.98 },
+  fanscope: { sx: 0.56, sy: 0.3, yaw: 0.12, size: 0.98 },
+  'adapt-to-china': { sx: 0.4, sy: 0.74, yaw: 0.08, size: 0.92 },
+  'supplier-document-intelligence': { sx: -0.54, sy: 0.76, yaw: -0.1, size: 0.98 },
+  about: { sx: -0.6, sy: -0.27, yaw: 0.16, size: 0.98 },
+  life: { sx: -0.62, sy: 0.27, yaw: 0, size: 0.92 },
 };
 
 export const POOL = {

@@ -3,21 +3,26 @@
    Design tokens, base, layout and components. No framework; plain modern CSS.
    ========================================================================== */
 
-/* Typography: Cahuenga (Luxtypo, commercial) for titles and body.
-   It is used when installed locally; to self-host it after buying the web
-   licence, add  src: url('/fonts/cahuenga-regular.woff2') format('woff2')
-   (and the bold/italic files) to the Cahuenga faces below.
-   Until then the open-source Source Serif 4 (SIL OFL) is the fallback. */
+/* Typography (see AGENTS.md): Piedra for the name and major headings, Cherry
+   Cream Soda for short editorial statements, Geo for short labels, Source
+   Serif 4 for reading, JetBrains Mono for simulated UI and data. All are
+   self-hosted; licences are in /fonts/licenses/. */
 @font-face {
-  font-family: 'Cahuenga';
-  src: local('Cahuenga'), local('Cahuenga Regular'), local('Cahuenga-Regular');
+  font-family: 'Piedra';
+  src: url('/fonts/piedra.woff2') format('woff2');
   font-weight: 400;
   font-display: swap;
 }
 @font-face {
-  font-family: 'Cahuenga';
-  src: local('Cahuenga Bold'), local('Cahuenga-Bold');
-  font-weight: 600 900;
+  font-family: 'Cherry Cream Soda';
+  src: url('/fonts/cherry-cream-soda.woff2') format('woff2');
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Geo';
+  src: url('/fonts/geo.woff2') format('woff2');
+  font-weight: 400;
   font-display: swap;
 }
 @font-face {
@@ -64,8 +69,10 @@
   --accent: var(--aqua-deep);
   --accent-ink: var(--aqua-ink);
 
-  --font-display: 'Cahuenga', 'Source Serif 4', Georgia, 'Times New Roman', serif;
-  --font-body: 'Cahuenga', 'Source Serif 4', Georgia, 'Times New Roman', serif;
+  --font-display: 'Piedra', 'Source Serif 4', Georgia, 'Times New Roman', serif;
+  --font-editorial: 'Cherry Cream Soda', 'Source Serif 4', Georgia, 'Times New Roman', serif;
+  --font-label: 'Geo', 'JetBrains Mono', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+  --font-body: 'Source Serif 4', Georgia, 'Times New Roman', serif;
   --font-mono: 'JetBrains Mono', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
 
   --gutter: clamp(16px, 4vw, 48px);
@@ -2952,14 +2959,6 @@ body.about-landing .site-footer { margin-top: 0; }
 .pool--live .pool-obj:focus-visible .pool-obj__label { opacity: 1; transform: translateX(-50%); }
 
 
-/* Centre of the pool: under the floor lettering, the two primary actions. */
-.pool__center { position: absolute; left: 50%; top: 63%; transform: translate(-50%, 0); z-index: 3; pointer-events: none; }
-.pool__center-ctas { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
-.pool__center-ctas .btn { pointer-events: auto; box-shadow: 0 14px 28px -14px rgba(5, 45, 70, 0.65); }
-@media (max-aspect-ratio: 5/6) {
-  .pool__center { top: 58%; width: 86%; }
-  .pool__center-ctas .btn { padding: 10px 16px; font-size: 14px; }
-}
 
 /* ========================================================================
    V8 — one-screen project sheets, serif typography, home flow
@@ -3025,11 +3024,6 @@ h1, h2, h3, h4 { letter-spacing: -0.012em; font-variation-settings: normal; }
   .sheet__facts > div { grid-template-columns: 1fr; gap: 4px; }
 }
 
-/* Home flow: pool → about → work → life */
-.home-flow .about-v6__hero { padding-top: 88px; }
-.home-work { padding: 96px 0 24px; }
-.home-work__head h2 { font-size: clamp(32px, 4.4vw, 56px); max-width: 22ch; margin-top: 8px; }
-.home-work__head h2 em { color: var(--aqua-deep); }
 /* sheet: fit on one 1440×900 screen */
 .sheet { padding: calc(var(--header-h) + 8px) 0 24px; }
 .sheet__grid { grid-template-columns: minmax(0, 11fr) minmax(0, 12fr); gap: 48px; }
@@ -3151,3 +3145,212 @@ h1, h2, h3, h4 { letter-spacing: -0.012em; font-variation-settings: normal; }
 .atc2__proof .testimonial .eyebrow { font-size: 10px; }
 .atc2__foot { margin-top: 18px; padding-top: 16px; }
 .atc2__lesson { font-size: 17px; }
+
+/* ========================================================================
+   V10 — type system, one-screen Home, Life page, summer water accents
+   ======================================================================== */
+:root {
+  --sun: #ffd84d;
+  --turquoise: #18b6dc;
+  --turquoise-deep: #0b7fa6;
+  --water-band: linear-gradient(90deg, #0fa7d6, #4fdcef 42%, #12b3dc 70%, #0a8fc0);
+}
+html { font-synthesis: none; }
+
+/* --- Display: Piedra has one weight and no italic, so it gets neither. */
+h1, h2 { font-family: var(--font-display); font-weight: 400; letter-spacing: 0.005em; line-height: 1.04; }
+h1 em, h2 em { font-style: normal; }
+.page-top h1, .case-hero h1, .sheet h1, .lost h1, .pool__title { font-weight: 400; letter-spacing: 0.005em; }
+.about-v6__hero :is(h1, h2), .about-v6__chapter-main h2, .about-v6__principles h2, .about-v6__life-head h2, .about-v6__closing h2 { letter-spacing: 0.005em; }
+.card__title, .next-link b, .atc2__stats b { font-family: var(--font-display); font-weight: 400; letter-spacing: 0.01em; }
+.decisions li::before, .about-v6__portrait-stamp { font-weight: 400; }
+.brand { font-weight: 400; font-size: 23px; letter-spacing: 0.01em; }
+.brand__mark { font-size: 17px; font-weight: 400; }
+
+/* --- Section titles too small for Piedra stay in the reading serif. */
+h3, h4 { font-family: var(--font-body); font-weight: 700; letter-spacing: -0.008em; }
+.about-v6__proof-item strong, .about-v6__path strong, .about-v6__education-title strong, .about-figure figcaption strong { font-family: var(--font-body); font-weight: 700; letter-spacing: -0.008em; }
+.testimonial blockquote { font-family: var(--font-body); }
+
+/* --- Editorial: Cherry Cream Soda for one idea at a time, never long copy. */
+.about-v6__statement, .sheet__oneliner, .atc2__lesson, .contact-block__email, .page-top__question, .life-hero__lead, .life-card__line {
+  font-family: var(--font-editorial);
+  font-style: normal;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+.about-v6__statement { font-size: clamp(20px, 2vw, 26px); line-height: 1.34; max-width: 34ch; }
+.sheet__oneliner { font-size: clamp(16px, 1.3vw, 18px); line-height: 1.45; }
+.atc2__lesson { font-size: 15.5px; line-height: 1.5; }
+.contact-block__email { font-size: clamp(20px, 2.1vw, 27px); }
+.page-top .lead { font-size: clamp(17px, 1.6vw, 20px); line-height: 1.6; }
+.page-top__question { font-size: clamp(19px, 2.2vw, 28px); line-height: 1.3; color: var(--ink); margin: 18px 0 0; max-width: 38ch; }
+.page-top__question em { font-style: normal; color: var(--turquoise-deep); }
+
+/* --- Labels: Geo in sentence case, for short lines of words. Its capital A
+   reads like an R and its numerals are old-style, so names people navigate by
+   go to Cherry Cream Soda, and dates, ranks and counts stay in the mono. */
+.eyebrow, .pool__hint, .pool__status, .about-v6__section-label, .about-v6__overline, .about-v6__keywords,
+.about-v6__hero-portrait figcaption, .about-v6__proof-item .about-v6__proof-index, .sheet__facts dt,
+.sheet__limits strong, .sheet__steps span, .contact-block__label, .atc2__col > h3, .next-link small,
+.about-v6__gallery .about-v6__photo figcaption span {
+  font-family: var(--font-label);
+  font-weight: 400;
+  font-size: 15px;
+  letter-spacing: 0.035em;
+  line-height: 1.3;
+  text-transform: none;
+}
+.about-v6__section-label span { font-family: var(--font-mono); font-size: 12px; font-weight: 500; }
+.nav a, .btn, .filters button, .card__more, .about-v6__text-link, .pool__list-link, .pool-obj__label, .site-footer nav {
+  font-family: var(--font-editorial);
+  font-weight: 400;
+  letter-spacing: 0.01em;
+}
+.nav a { font-size: 15.5px; padding: 6px 13px; }
+.btn { font-size: 15px; }
+.sheet__links .btn { font-size: 14.5px; }
+.filters button { font-size: 14.5px; }
+.card__more { font-size: 15px; }
+.about-v6__text-link { font-size: 14.5px; }
+.pool__list-link { font-size: 14.5px; }
+.site-footer nav { font-size: 14px; }
+.about-v6__path { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+/* --- Water accents on the inner pages. */
+.page-top::before, .sheet::before, .about-v6__hero::after {
+  height: 14px;
+  background: var(--water-band);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='14'%3E%3Cpath d='M0 0h120v8c-20 8-40 8-60 0S20 0 0 8z'/%3E%3C/svg%3E") repeat-x;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='14'%3E%3Cpath d='M0 0h120v8c-20 8-40 8-60 0S20 0 0 8z'/%3E%3C/svg%3E") repeat-x;
+}
+.brand__mark { background: linear-gradient(160deg, #56dcef, #0f9fd0); }
+
+/* --- Home: the pool is the page. */
+.page-home .site-footer { display: none; }
+.page-home .site-header { pointer-events: none; }
+.page-home .site-header a { pointer-events: auto; }
+.pool {
+  --fw-l: min(calc(100vw - 2 * var(--gutter)), calc((100svh - var(--header-h) - var(--fw-reserve, 82px)) * 1.6), 1500px);
+  --fw: max(var(--fw-l), 480px);
+  --fh: calc(var(--fw) / 1.6);
+  min-height: max(100svh, calc(var(--fh) + var(--header-h) + 82px));
+}
+.pool__layout { padding-bottom: 6px; grid-template-rows: var(--header-h) minmax(var(--fh), 1fr) auto; }
+.pool__frame { align-self: center; }
+.pool__bar { padding-top: calc(var(--fw) * 0.03 + 2px); }
+.page-home .nav { background: rgba(255, 253, 248, 0.82); border-radius: 999px; padding: 3px; box-shadow: var(--shadow-1); }
+.pool::before { display: none; }
+
+/* Static pool (no JavaScript, no WebGL, or still loading). */
+.pool__static { background: #36c6ea; }
+.pool__static-water {
+  background-image:
+    radial-gradient(75% 55% at 45% 48%, rgba(255,255,255,0.3), rgba(255,255,255,0) 66%),
+    linear-gradient(rgba(255,255,255,0.16) 1.2px, transparent 1.2px),
+    linear-gradient(90deg, rgba(255,255,255,0.16) 1.2px, transparent 1.2px),
+    linear-gradient(170deg, #6fe0f4 0%, #35c8ec 44%, #14a9dc 100%);
+}
+.pool__floor-type { color: #08388f; opacity: .92; transform: none; text-shadow: none; }
+.pool__floor-type strong { font: 400 clamp(38px, 7.2vw, 104px)/1.06 var(--font-display); letter-spacing: 0.01em; }
+.pool__floor-type span { font: 400 clamp(17px, 2.9vw, 40px)/1.3 var(--font-label); color: #08388f; letter-spacing: 0.02em; }
+.pool-obj { --r: calc(var(--fw) * 0.042); }
+.pool-obj--flagship { --r: calc(var(--fw) * 0.068); }
+.pool .pool-obj__glyph img { filter: drop-shadow(0 8px 8px rgba(5, 65, 85, 0.24)); }
+
+.pool__static-water::after { display: none; }
+.pool--unsupported .pool__hint { display: none; }
+.pool__status { flex: 1; }
+.pool__bar { flex-wrap: nowrap; }
+.pool__list-link { white-space: nowrap; }
+
+/* Labels are always on: touch has no hover and the floats no longer print names. */
+.pool-obj__label {
+  font-size: 13px;
+  padding: 2px 10px;
+  min-height: 24px;
+  background: rgba(255, 253, 248, 0.9);
+  box-shadow: 0 4px 10px -6px rgba(0, 40, 70, 0.55);
+}
+.pool-obj--flagship .pool-obj__label { font-size: 13px; background: #c93a24; }
+.pool-obj--place .pool-obj__label { background: var(--sun); }
+.pool--live .pool-obj__label { opacity: 1; transform: translateX(-50%); }
+.pool-obj.is-active .pool-obj__label, .pool-obj:focus-visible .pool-obj__label { background: var(--ink); color: #fff; }
+.pool-obj__tip { font-family: var(--font-body); }
+.pool-obj__tip--below { bottom: auto; top: calc(var(--r) + 40px); }
+.pool__wipe { background: radial-gradient(circle at var(--wx, 50%) var(--wy, 50%), #63e0f2, #17b4de 40%, #0a8fc0); }
+
+@media (max-aspect-ratio: 5/6) {
+  .pool {
+    --fw: min(calc(100vw - 32px), calc((100svh - var(--header-h) - 96px) / 1.6), 640px);
+    --fh: calc(var(--fw) * 1.6);
+    min-height: max(100svh, calc(var(--fh) + var(--header-h) + 96px));
+  }
+  .pool__layout { grid-template-rows: var(--header-h) minmax(var(--fh), 1fr) auto; align-content: stretch; }
+  .pool__floor-type { top: 36%; bottom: 36%; }
+  .pool__floor-type strong { font-size: clamp(38px, 12.4vw, 82px); }
+  .pool__floor-type span { font-size: clamp(18px, 5.4vw, 34px); }
+  .pool-obj { --r: calc(var(--fw) * 0.082); }
+  .pool-obj--flagship { --r: calc(var(--fw) * 0.122); }
+  .pool-obj__label, .pool-obj--flagship .pool-obj__label { font-size: 12.5px; min-height: 26px; padding: 1px 9px; }
+  .pool__bar { justify-content: center; flex-wrap: wrap; padding-top: calc(var(--fw) * 0.05 + 2px); row-gap: 6px; text-align: center; }
+  .pool__hint { width: 100%; }
+  .pool__status { flex-basis: 100%; }
+  .pool:not(.pool--live) a[href='/about/'] .pool-obj__label { top: -13px; left: calc(var(--r) + 34px); }
+}
+
+/* --- Header on narrow phones: four links and the mark, without crowding. */
+@media (max-width: 560px) {
+  .brand__name { display: none; }
+  .nav { gap: 2px; }
+  .nav a { font-size: 14px; padding: 5px 10px; }
+}
+@media (max-width: 360px) {
+  .nav a { font-size: 13px; padding: 5px 7px; }
+}
+
+/* --- Life page. */
+.life-hero {
+  position: relative;
+  padding: calc(var(--header-h) + 72px) 0 76px;
+  color: #fff;
+  background:
+    radial-gradient(60% 90% at 88% 0%, rgba(120, 236, 248, 0.5), transparent 70%),
+    linear-gradient(155deg, #0b7fa6 0%, #0a6f9f 58%, #0a5f90 100%);
+}
+.life-hero + .life-grid { margin-top: -40px; position: relative; }
+.page-life .brand { color: #fff; }
+.page-life .nav a { color: #eafafd; }
+.page-life .nav a:hover { color: #fff; background: rgba(255, 255, 255, 0.16); }
+.page-life .nav a[aria-current='page'] { color: var(--ink); background: var(--card); }
+.life-hero .about-v6__overline { color: #dff6fa; font-size: 16px; margin-bottom: 20px; }
+.life-hero .about-v6__accent-dot { background: var(--sun); box-shadow: 0 0 0 5px rgba(255, 216, 77, 0.2); }
+.life-hero h1 { font-size: clamp(48px, 9vw, 118px); line-height: 1; }
+.life-hero h1 em { color: var(--sun); }
+.life-hero__lead { font-size: clamp(19px, 2.2vw, 27px); line-height: 1.32; margin: 22px 0 0; max-width: 34ch; color: #f2fbfd; }
+.life-hero__jump { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 30px; padding-bottom: 28px; font-family: var(--font-editorial); font-size: 15px; }
+.life-hero__jump a { color: #fff; text-underline-offset: 5px; text-decoration-color: rgba(255, 255, 255, 0.5); }
+.life-hero__jump a:hover { color: var(--sun); }
+.life-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; align-items: stretch; }
+.life-card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-1);
+  padding: 24px 22px 24px;
+  scroll-margin-top: 24px;
+  min-width: 0;
+}
+.life-card__index { font-family: var(--font-mono); font-size: 12px; color: var(--turquoise-deep); }
+.life-card h2 { font-size: clamp(30px, 3.1vw, 40px); margin: 10px 0 12px; }
+.life-card__line { font-size: 18px; line-height: 1.36; color: var(--ink); margin-bottom: 12px; }
+.life-card p:not(.life-card__line) { font-size: 15.5px; line-height: 1.6; color: var(--ink-2); margin: 0 0 8px; }
+.life-card .region-chips { margin-top: 14px; gap: 6px; }
+.life-card .region-chips li { padding: 4px 8px; }
+#gallery { scroll-margin-top: 24px; padding-top: 88px; padding-bottom: 96px; }
+.life-next { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 32px; }
+@media (max-width: 1000px) { .life-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) {
+  .life-grid { grid-template-columns: 1fr; }
+  .life-hero { padding-top: calc(var(--header-h) + 44px); }
+}

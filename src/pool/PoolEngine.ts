@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import {
   causticsFrag,
   causticsVert,
@@ -7,16 +6,16 @@ import {
   dropFrag,
   fullscreenVert,
   MAX_DROPS,
-  MAX_SHADOWS,
   normalFrag,
   poolFrag,
   poolVert,
+  swellAt,
   updateFrag,
   waterFrag,
   waterVert,
 } from './shaders';
 import { FloatShadows } from './FloatShadows';
-import { builders, baseScale, disposeObjectResources, type BuiltObject } from './objects';
+import { builders, disposeObjectResources, type BuiltObject } from './objects';
 import { landscapeLayout, POOL, portraitLayout, type PoolObjectId } from './layout';
 
 export interface Anchor {
@@ -49,6 +48,9 @@ interface ObjState {
   hover: number;
   phase: number;
   prevY: number;
+  /** vertical spring state: floats lag the swell rather than trace it */
+  lift: number;
+  liftVel: number;
   nextRipple: number;
   tilt: THREE.Vector2;
   tiltVel: THREE.Vector2;
@@ -60,7 +62,7 @@ const { halfX: W, halfZ: L, depth: D, rimH: RIM, coping: COPING } = POOL;
 
 /**
  * Real-time pool: heightfield water simulation on the GPU, caustics, a
- * ray-traced tiled interior, a tiled deck, and six floating objects.
+ * ray-traced tiled interior, a tiled deck, and seven floating objects.
  * All state lives here; React only mounts it and draws DOM labels.
  */
 export class PoolEngine {
@@ -110,6 +112,10 @@ export class PoolEngine {
   private pixelRatio = 1;
   private envRT: THREE.WebGLRenderTarget | null = null;
   private floorTypeTex: THREE.CanvasTexture;
+  private leafTex: THREE.CanvasTexture;
+  /** Caustics are re-rendered every Nth frame; slow devices raise this. */
+  private causticEvery: number;
+  private frameCount = 0;
   private disposed = false;
 
   constructor(
@@ -120,9 +126,13 @@ export class PoolEngine {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false, powerPreference: 'high-performance' });
     this.renderer.setClearColor(0xf5f0e7, 1);
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
-    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 0.96;
+    // Neutral keeps brand colours and duck yellow from shifting (the water and
+    // deck are hand-graded shaders and bypass tone mapping entirely).
+    this.renderer.toneMapping = THREE.NeutralToneMapping;
+    this.renderer.toneMappingExposure = 1;
     this.pixelRatio = Math.min(window.devicePixelRatio || 1, opts.coarse ? 1.5 : 2);
+    // Light pattern moves slowly: phones can refresh it every other frame unseen.
+    this.causticEvery = opts.coarse ? 2 : 1;
     this.renderer.setPixelRatio(this.pixelRatio);
 
     // --- Simulation targets ------------------------------------------
@@ -162,7 +172,13 @@ export class PoolEngine {
     this.normalMat = new THREE.ShaderMaterial({
       vertexShader: fullscreenVert,
       fragmentShader: normalFrag,
-      uniforms: { tex: { value: null }, delta: { value: delta }, cell: { value: new THREE.Vector2((2 * W) / simW, (2 * L) / simH) } },
+      uniforms: {
+        tex: { value: null },
+        delta: { value: delta },
+        cell: { value: new THREE.Vector2((2 * W) / simW, (2 * L) / simH) },
+        halfSize: { value: new THREE.Vector2(W, L) },
+        windTime: { value: 0 },
+      },
     });
     this.simQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.updateMat);
     this.simQuad.frustumCulled = false;
@@ -179,36 +195,36 @@ export class PoolEngine {
       ink.clearRect(0, 0, lettering.width, lettering.height);
       ink.textAlign = 'center';
       ink.textBaseline = 'middle';
-      ink.fillStyle = '#0f5a84';
-      ink.font = '700 136px "Cahuenga", "Source Serif 4", Georgia, serif';
-      ink.fillText('Martin Zhong', 768, 448, 1000);
-      ink.fillStyle = '#1f6b95';
-      ink.font = 'italic 500 56px "Cahuenga", "Source Serif 4", Georgia, serif';
-      ink.fillText('welcome to my world', 768, 555, 870);
+      ink.fillStyle = '#fff';
+      ink.font = '400 192px "Piedra", Georgia, serif';
+      ink.fillText('Martin Zhong', 768, 442, 1120);
+      ink.font = '400 76px "Geo", ui-monospace, monospace';
+      ink.fillText('welcome to my world', 768, 582, 900);
       if (this.floorTypeTex) this.floorTypeTex.needsUpdate = true;
     };
     paintLettering();
     this.floorTypeTex = new THREE.CanvasTexture(lettering);
-    document.fonts?.load('700 136px "Source Serif 4"').then(paintLettering).catch(() => undefined);
-    this.floorTypeTex.colorSpace = THREE.SRGBColorSpace;
-    this.floorTypeTex.minFilter = THREE.LinearFilter;
+    Promise.all([document.fonts?.load('400 192px "Piedra"'), document.fonts?.load('400 76px "Geo"')]).then(paintLettering).catch(() => undefined);
+    this.floorTypeTex.generateMipmaps = true;
+    this.floorTypeTex.minFilter = THREE.LinearMipmapLinearFilter;
     this.floorTypeTex.magFilter = THREE.LinearFilter;
+    this.floorTypeTex.anisotropy = 4;
+
+    this.leafTex = paintFoliage();
 
     // --- Shared pool uniforms ----------------------------------------
-    const light = new THREE.Vector3(-0.35, 1.0, -0.44).normalize();
+    const light = new THREE.Vector3(-0.35, 1.0, -0.56).normalize();
     this.shared = {
       halfSize: { value: new THREE.Vector2(W, L) },
       depth: { value: D },
       rimH: { value: RIM },
       floorTypeTex: { value: this.floorTypeTex },
+      leafTex: { value: this.leafTex },
       portraitMode: { value: 0 },
       poolTime: { value: 0 },
       light: { value: light },
       causticTex: { value: this.causticRT.texture },
       shadowTex: { value: null },
-      shadows: { value: Array.from({ length: MAX_SHADOWS }, () => new THREE.Vector4()) },
-      shadowY: { value: new Array(MAX_SHADOWS).fill(0) },
-      shadowCount: { value: 0 },
     };
 
     // --- Caustics ------------------------------------------------------
@@ -225,6 +241,7 @@ export class PoolEngine {
         light: this.shared.light,
         halfSize: this.shared.halfSize,
         depth: this.shared.depth,
+        focusGain: { value: 6.5 },
       },
       blending: THREE.AdditiveBlending,
       transparent: true,
@@ -244,12 +261,11 @@ export class PoolEngine {
         ...this.shared,
         water: { value: null },
         sunDir: { value: light },
-        absorb: { value: new THREE.Vector3(0.52, 0.13, 0.07) },
-        deepColor: { value: new THREE.Vector3(0.04, 0.53, 0.78) },
+        absorb: { value: new THREE.Vector3(0.62, 0.055, 0.02) },
+        deepColor: { value: new THREE.Vector3(0.02, 0.62, 0.86) },
         time: { value: 0 },
-        floatColors: { value: [new THREE.Color('#f7efe4'), new THREE.Color('#2b5f49'), new THREE.Color('#0f665f'), new THREE.Color('#eef6fb'), new THREE.Color('#173a63'), new THREE.Color('#f6efe2'), new THREE.Color(), new THREE.Color()] },
-        floatBody: { value: Array.from({ length: 8 }, () => new THREE.Vector4()) },
-        floatShape: { value: new Array(8).fill(-1) },
+        footprintTex: { value: null },
+        contactTex: { value: null },
       },
     });
     const water = new THREE.Mesh(gridGeo(simW, simH), this.waterMat);
@@ -269,20 +285,28 @@ export class PoolEngine {
     this.deckMat = new THREE.ShaderMaterial({
       vertexShader: poolVert,
       fragmentShader: deckFrag,
-      uniforms: { halfSize: this.shared.halfSize, coping: { value: COPING } },
+      uniforms: { halfSize: this.shared.halfSize, coping: { value: COPING }, leafTex: this.shared.leafTex, poolTime: this.shared.poolTime },
     });
     const deck = new THREE.Mesh(new THREE.PlaneGeometry(24, 24).rotateX(-Math.PI / 2), this.deckMat);
     deck.position.y = RIM;
     this.scene.add(deck);
 
-    // Lighting for the clay objects
+    // Lighting for the floats: a hand-built summer sky, so their reflections
+    // show the same sun that drives the caustics and shadows.
     const pmrem = new THREE.PMREMGenerator(this.renderer);
-    this.envRT = pmrem.fromScene(new RoomEnvironment(), 0.04);
+    const sky = skyDome(light);
+    this.envRT = pmrem.fromScene(sky, 0.02);
     pmrem.dispose();
+    sky.traverse((n) => {
+      const m = n as THREE.Mesh;
+      m.geometry?.dispose();
+      (m.material as THREE.Material | undefined)?.dispose();
+    });
     this.scene.environment = this.envRT.texture;
-    this.scene.environmentIntensity = 0.4;
-    this.scene.add(new THREE.HemisphereLight(0xffffff, 0x8fd6e3, 1.0));
-    const sun = new THREE.DirectionalLight(0xfff6e6, 1.4);
+    this.scene.environmentIntensity = 0.42;
+    // Turquoise bounce from the water fills the undersides.
+    this.scene.add(new THREE.HemisphereLight(0xfffaf0, 0x53d4e6, 0.95));
+    const sun = new THREE.DirectionalLight(0xfff1dc, 2.05);
     sun.position.copy(light).multiplyScalar(6);
     this.scene.add(sun);
 
@@ -307,7 +331,7 @@ export class PoolEngine {
       const holder = new THREE.Group();
       holder.add(built.group);
       const hit = new THREE.Mesh(
-        new THREE.BoxGeometry(built.hx * 2.2, built.top + 0.16, built.hz * 2.2),
+        new THREE.CylinderGeometry(built.radius * 1.12, built.radius * 1.12, built.top + 0.16, 24),
         new THREE.MeshBasicMaterial({ visible: false }),
       );
       hit.position.y = built.top / 2;
@@ -327,6 +351,8 @@ export class PoolEngine {
         hover: 0,
         phase: i * 1.37,
         prevY: 0,
+        lift: 0,
+        liftVel: 0,
         nextRipple: 0.19 * i,
         tilt: new THREE.Vector2(),
         tiltVel: new THREE.Vector2(),
@@ -335,8 +361,10 @@ export class PoolEngine {
       });
     });
 
-    this.floatShadows = new FloatShadows(this.renderer, this.objects.map(o => o.built.group), this.shared.halfSize.value, D, light);
+    this.floatShadows = new FloatShadows(this.renderer, this.objects.map(o => o.built.group), this.shared.halfSize.value, D, light, opts.coarse);
     this.shared.shadowTex.value = this.floatShadows.target.texture;
+    this.waterMat.uniforms.footprintTex.value = this.floatShadows.footprint.texture;
+    this.waterMat.uniforms.contactTex.value = this.floatShadows.contact.texture;
     this.bind();
     this.resize(true);
     // A few opening drops so the first frame already looks like water.
@@ -371,7 +399,7 @@ export class PoolEngine {
             if (obj.diving) continue;
             const delta = obj.pos.clone().sub(p);
             const dist = delta.length();
-            const radius = Math.max(obj.built.hx, obj.built.hz) * obj.scale;
+            const radius = obj.built.radius * obj.scale;
             const reach = radius + 0.17;
             if (dist > reach) continue;
             // Push in the pointer's direction, plus a small outward component
@@ -572,6 +600,7 @@ export class PoolEngine {
     // The texture artwork is lit from screen upper-left. Rotate world sunlight
     // with the portrait camera so floor shadows always fall screen lower-right.
     this.shared.light.value.set(-0.35, 1.0, portrait ? 0.56 : -0.56).normalize();
+    this.scene.environmentRotation.y = portrait ? 2 * Math.atan2(0.56, 0.35) : 0;
     const sunlight = this.scene.children.find(n => n instanceof THREE.DirectionalLight);
     sunlight?.position.copy(this.shared.light.value).multiplyScalar(6);
     const a = portrait ? L : W; // half extent along screen-x
@@ -596,7 +625,7 @@ export class PoolEngine {
         o.pos.copy(o.home);
         o.vel.set(0, 0);
         o.yaw = slot.yaw + (portrait ? Math.PI / 2 : 0);
-        o.scale = baseScale[o.id] * slot.size * (portrait ? 1.0 : 1.0);
+        o.scale = slot.size;
       }
     }
     if (!this.running) this.renderOnce();
@@ -657,12 +686,12 @@ export class PoolEngine {
       this.placeCamera();
     }
 
-    // Ambient breeze ripples
+    // The odd stray gust. The wave field does the steady work.
     if (!rm && this.time > this.nextAmbient) {
-      this.nextAmbient = this.time + 0.09 + Math.random() * 0.18;
+      this.nextAmbient = this.time + 0.5 + Math.random() * 0.9;
       const x = (Math.random() * 2 - 1) * (W - 0.1);
       const z = (Math.random() * 2 - 1) * (L - 0.1);
-      this.queueDrop(x, z, 0.025 + Math.random() * 0.03, (Math.random() < 0.5 ? -1 : 1) * (0.002 + Math.random() * 0.003));
+      this.queueDrop(x, z, 0.04 + Math.random() * 0.04, (Math.random() < 0.5 ? -1 : 1) * (0.0015 + Math.random() * 0.002));
     }
 
     this.updateObjects(dt);
@@ -680,22 +709,24 @@ export class PoolEngine {
       const steps = Math.min(3, Math.max(1, Math.round(dt * 120)));
       for (let i = 0; i < steps; i++) this.pass(this.updateMat);
     }
+    // Reduced motion freezes the wind rather than flattening the water.
+    this.normalMat.uniforms.windTime.value = rm ? 0 : this.time;
     this.pass(this.normalMat);
 
     // --- Caustics
-    this.causticMat.uniforms.water.value = this.rtA.texture;
-    r.setRenderTarget(this.causticRT);
-    r.setClearColor(0x000000, 1);
-    r.clear();
-    r.render(this.causticScene, this.simCam);
+    if (this.frameCount++ % this.causticEvery === 0 || still) {
+      this.causticMat.uniforms.water.value = this.rtA.texture;
+      r.setRenderTarget(this.causticRT);
+      r.setClearColor(0x000000, 1);
+      r.clear();
+      r.render(this.causticScene, this.simCam);
+    }
 
     // --- Main view
-    this.updateSubmergedVolumes();
     this.floatShadows.render();
-    for (const o of this.objects) o.built.updateWater?.(this.rtA.texture, this.shared.halfSize.value, o.holder.position.y);
     this.waterMat.uniforms.water.value = this.rtA.texture;
     this.waterMat.uniforms.time.value = this.time;
-    this.shared.poolTime.value = this.time;
+    this.shared.poolTime.value = rm ? 0 : this.time;
     r.setRenderTarget(null);
     r.setClearColor(0xf5f0e7, 1);
     r.render(this.scene, this.camera);
@@ -731,40 +762,45 @@ export class PoolEngine {
       o.vel.clampLength(0, 0.85);
       const speed = o.vel.length();
       o.pos.addScaledVector(o.vel, dt);
-      // Tilt spring
-      o.tiltVel.x += (-o.tilt.x * 18 - o.tiltVel.x * 4) * dt;
-      o.tiltVel.y += (-o.tilt.y * 18 - o.tiltVel.y * 4) * dt;
-      o.tilt.addScaledVector(o.tiltVel, dt);
-      o.tilt.clampScalar(-0.35, 0.35);
-
       const target = active === o.id ? 1 : 0;
       o.hover += (target - o.hover) * (1 - Math.exp(-dt * 12));
       o.dive += ((o.diving ? 1 : 0) - o.dive) * (1 - Math.exp(-dt * 7));
 
+      // Buoyancy: the float is sprung to the swell it is sitting on, with a
+      // little lag and overshoot that grow with its mass.
       const t = this.time;
-      const bob = rm ? 0 : Math.sin(t * 1.25 + o.phase) * 0.011;
-      const y = bob + o.hover * 0.03 - o.dive * 0.32;
+      const swell = rm ? null : swellAt(o.pos.x, o.pos.y, t);
+      const mass = o.built.mass;
+      o.liftVel += (((swell?.height ?? 0) * 2.6 - o.lift) * (46 / mass) - o.liftVel * (7 / mass)) * dt;
+      o.lift += o.liftVel * dt;
+      const cosYaw = Math.cos(o.yaw);
+      const sinYaw = Math.sin(o.yaw);
+      const pitchTarget = swell ? -(swell.slopeZ * cosYaw - swell.slopeX * sinYaw) * 2.4 : 0;
+      const rollTarget = swell ? (swell.slopeX * cosYaw + swell.slopeZ * sinYaw) * 2.4 : 0;
+      o.tiltVel.x += ((pitchTarget - o.tilt.x) * (24 / mass) - o.tiltVel.x * 4.5) * dt;
+      o.tiltVel.y += ((rollTarget - o.tilt.y) * (24 / mass) - o.tiltVel.y * 4.5) * dt;
+      o.tilt.addScaledVector(o.tiltVel, dt);
+      // Rock only as far as the freeboard allows: past this the low edge of a
+      // wide float would dip through the opaque water surface.
+      o.tilt.clampScalar(-o.built.maxTilt, o.built.maxTilt);
+
+      const y = o.lift + o.hover * 0.012 - o.dive * 0.32;
       const h = o.holder;
       h.position.set(o.pos.x, y, o.pos.y);
-      h.rotation.set(
-        o.tilt.x + (rm ? 0 : Math.sin(t * 0.8 + o.phase) * 0.035),
-        o.yaw + (rm ? 0 : Math.sin(t * 0.22 + o.phase) * 0.05),
-        o.tilt.y + (rm ? 0 : Math.cos(t * 0.9 + o.phase) * 0.03),
-        'YXZ',
-      );
-      h.scale.setScalar(o.scale * (1 + o.hover * 0.06) * (1 - o.dive * 0.25));
+      h.rotation.set(o.tilt.x, o.yaw + (rm ? 0 : Math.sin(t * 0.22 + o.phase) * 0.05), o.tilt.y, 'YXZ');
+      h.scale.setScalar(o.scale * (1 + o.hover * 0.05) * (1 - o.dive * 0.25));
+      if (!rm) o.built.animate?.(t, o.hover, speed);
 
       // Bobbing and drifting push water around the float.
       if (dt > 0) {
         const dy = y - o.prevY;
-        const r = Math.max(o.built.hx, o.built.hz) * o.scale * 0.85;
-        if (Math.abs(dy) > 1e-5) this.queueDrop(o.pos.x, o.pos.y, r, -dy * 0.9);
+        const r = o.built.radius * o.scale * 0.85;
+        if (Math.abs(dy) > 1e-4) this.queueDrop(o.pos.x, o.pos.y, r, -dy * 0.5);
         if (speed > 0.05) this.queueDrop(o.pos.x - o.vel.x * 0.15, o.pos.y - o.vel.y * 0.15, r * 0.6, speed * 0.004);
-        // Repeating low-amplitude circular waves make the float visibly sit
-        // *in* the water rather than hovering above a flat background.
+        // An occasional low ring off the hull, as the float settles.
         if (!rm && this.time >= o.nextRipple) {
-          this.queueDrop(o.pos.x, o.pos.y, Math.max(0.055, r * 0.85), -0.003);
-          o.nextRipple = this.time + 0.62 + 0.06 * o.phase;
+          this.queueDrop(o.pos.x, o.pos.y, Math.max(0.055, r * 0.85), -0.0016);
+          o.nextRipple = this.time + 1.7 + 0.2 * o.phase;
         }
       }
       o.prevY = y;
@@ -779,8 +815,8 @@ export class PoolEngine {
         const dx = b.pos.x - a.pos.x;
         const dz = b.pos.y - a.pos.y;
         const dist = Math.hypot(dx, dz);
-        const ra = Math.max(a.built.hx, a.built.hz) * a.scale * 0.81;
-        const rb = Math.max(b.built.hx, b.built.hz) * b.scale * 0.81;
+        const ra = a.built.radius * a.scale * 0.92;
+        const rb = b.built.radius * b.scale * 0.92;
         const required = ra + rb + 0.022;
         if (dist >= required) continue;
         const nx = dist > 1e-5 ? dx / dist : 1;
@@ -801,7 +837,7 @@ export class PoolEngine {
       }
     }
     for (const o of this.objects) {
-      const radius = Math.max(o.built.hx, o.built.hz) * o.scale * 0.87;
+      const radius = o.built.radius * o.scale;
       const edgeX = W - radius - 0.035;
       const edgeZ = L - radius - 0.035;
       if (Math.abs(o.pos.x) > edgeX) {
@@ -820,34 +856,11 @@ export class PoolEngine {
     }
   }
 
-  private updateSubmergedVolumes() {
-    const sh = this.shared.shadows.value as THREE.Vector4[];
-    const sy = this.shared.shadowY.value as number[];
-    let n = 0;
-    for (const o of this.objects) {
-      if (n >= MAX_SHADOWS) break;
-      const s = o.holder.scale.x;
-      // Shadow ellipse in world axes (account for yaw roughly by averaging when rotated)
-      const c = Math.abs(Math.cos(o.holder.rotation.y));
-      const sn = Math.abs(Math.sin(o.holder.rotation.y));
-      const rx = (o.built.hx * c + o.built.hz * sn) * s;
-      const rz = (o.built.hz * c + o.built.hx * sn) * s;
-      sh[n].set(o.pos.x, o.pos.y, rx, rz);
-      sy[n] = o.holder.position.y;
-      const fb = this.waterMat.uniforms.floatBody.value as THREE.Vector4[];
-      const fs = this.waterMat.uniforms.floatShape.value as number[];
-      fb[n].set(o.pos.x, o.pos.y, o.built.hx * s, o.holder.rotation.y);
-      fs[n] = o.dive > 0.5 ? -1 : o.built.shape;
-      n++;
-    }
-    this.shared.shadowCount.value = n;
-  }
-
   private emitAnchors() {
     const rightW = this.tmpV3b.set(1, 0, 0).applyQuaternion(this.camera.quaternion);
     for (const o of this.objects) {
       const p = this.tmpV3.set(o.pos.x, o.holder.position.y + o.built.top * o.scale * 0.5, o.pos.y);
-      const r = Math.max(o.built.hx, o.built.hz) * o.holder.scale.x;
+      const r = o.built.radius * o.holder.scale.x;
       const edge = p.clone().addScaledVector(rightW, r).project(this.camera);
       p.project(this.camera);
       const x = (p.x * 0.5 + 0.5) * this.cw;
@@ -859,20 +872,24 @@ export class PoolEngine {
     this.opts.onFrame(this.anchors, this.portrait);
   }
 
+  /** Step down one rung at a time while the frame rate stays under 40 fps. */
   private adaptQuality(dt: number) {
     if (this.frameTimes.length > 200) return;
     if (this.time < 1.5) return; // ignore warm-up
     this.frameTimes.push(dt);
-    if (this.frameTimes.length === 90) {
-      const avg = this.frameTimes.reduce((a, b) => a + b, 0) / this.frameTimes.length;
-      if (avg > 1 / 40 && this.pixelRatio > 1) {
-        this.pixelRatio = 1;
-        this.renderer.setPixelRatio(1);
-        this.renderer.setSize(this.cw, this.ch, false);
-        this.frameTimes.length = 0;
-      } else {
-        this.frameTimes.length = 201; // done measuring
-      }
+    if (this.frameTimes.length < 90) return;
+    const avg = this.frameTimes.reduce((a, b) => a + b, 0) / this.frameTimes.length;
+    this.frameTimes.length = 0;
+    if (avg <= 1 / 40) {
+      this.frameTimes.length = 201; // done measuring
+    } else if (this.pixelRatio > 1) {
+      this.pixelRatio = 1;
+      this.renderer.setPixelRatio(1);
+      this.renderer.setSize(this.cw, this.ch, false);
+    } else if (this.causticEvery < 2) {
+      this.causticEvery = 2;
+    } else {
+      this.frameTimes.length = 201; // nothing left to give up
     }
   }
 
@@ -909,9 +926,79 @@ export class PoolEngine {
     this.causticRT.dispose();
     this.envRT?.dispose();
     this.floorTypeTex.dispose();
+    this.leafTex.dispose();
     this.floatShadows.dispose();
     this.renderer.dispose();
   }
+}
+
+/** A sky to light the floats by: blue overhead, pale haze, one warm sun, water below. */
+function skyDome(sunDir: THREE.Vector3) {
+  const scene = new THREE.Scene();
+  scene.add(
+    new THREE.Mesh(
+      new THREE.SphereGeometry(10, 32, 16),
+      new THREE.ShaderMaterial({
+        side: THREE.BackSide,
+        uniforms: { sunDir: { value: sunDir.clone() } },
+        vertexShader: `varying vec3 vDir; void main() { vDir = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+        fragmentShader: `uniform vec3 sunDir; varying vec3 vDir;
+          void main() {
+            vec3 d = normalize(vDir);
+            vec3 c = mix(vec3(0.95, 1.0, 1.05), vec3(0.34, 0.62, 1.0), pow(max(d.y, 0.0), 0.6));
+            if (d.y < 0.0) c = mix(c, vec3(0.08, 0.62, 0.74), smoothstep(0.0, -0.18, d.y));
+            float a = max(dot(d, sunDir), 0.0);
+            c += vec3(1.0, 0.92, 0.78) * (pow(a, 900.0) * 60.0 + pow(a, 24.0) * 1.1);
+            gl_FragColor = vec4(c, 1.0);
+          }`,
+      }),
+    ),
+  );
+  return scene;
+}
+
+/**
+ * Palm and leaf shadows for the deck and pool floor, drawn once at low
+ * resolution: upscaling is what softens them, and canvas filters are not
+ * available everywhere. The red channel is shade (1 = full shadow).
+ */
+function paintFoliage() {
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = 256;
+  const c = canvas.getContext('2d');
+  const frond = (x: number, y: number, angle: number, length: number, leaves: number) => {
+    if (!c) return;
+    c.save();
+    c.translate(x, y);
+    c.rotate(angle);
+    for (let i = 1; i <= leaves; i++) {
+      const along = (i / leaves) * length;
+      const size = length * 0.42 * Math.sin((i / leaves) * Math.PI * 0.86 + 0.14);
+      for (const side of [1, -1]) {
+        c.beginPath();
+        c.moveTo(along, 0);
+        c.quadraticCurveTo(along + size * 0.45, side * size * 0.34, along + size * 0.72, side * size);
+        c.quadraticCurveTo(along + size * 0.2, side * size * 0.42, along, 0);
+        c.fill();
+      }
+    }
+    c.restore();
+  };
+  if (c) {
+    c.fillStyle = '#000';
+    c.fillRect(0, 0, 256, 256);
+    c.fillStyle = '#fff';
+    // Palm over the top-left corner, towards the sun, reaching over the coping.
+    for (const [a, l] of [[0.1, 46], [0.62, 56], [1.15, 54], [1.75, 42], [-0.42, 36]] as const) frond(50, 66, a, l, 11);
+    // Lower growth on the far corner, on the deck.
+    for (const [a, l] of [[3.5, 40], [4.05, 44], [2.95, 34], [4.6, 30]] as const) frond(214, 190, a, l, 10);
+  }
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.minFilter = THREE.LinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  texture.generateMipmaps = false;
+  texture.flipY = false; // canvas y is world z
+  return texture;
 }
 
 function sameRect(a: { x: number; y: number; w: number; h: number }, fr: DOMRect, cr: DOMRect) {
