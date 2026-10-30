@@ -1,69 +1,80 @@
-# Martin Zhong — Pool Portfolio V6 Refresh
+# Martin Zhong — Pool Portfolio
 
-An update of the approved V6 portfolio: React + TypeScript, build-time static HTML via esbuild, and a Three.js r184 water island. The V6 pool, typography, routes and five-project roster are retained. No deployment or push was performed.
+Martin Zhong's personal portfolio. The homepage is an interactive WebGL swimming pool: brand kickboards pushed by rubber ducks lead to five case studies, a paper boat leads to About, and a swim ring leads to Life.
 
-## Open on Windows
+Built with React (static rendering), TypeScript, esbuild and Three.js. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for how it works and [AGENTS.md](AGENTS.md) for contribution rules.
 
-Extract this ZIP, then open PowerShell in `martin-pool-portfolio`:
+## Getting started
+
+Requires Node 20.10 or newer.
 
 ```powershell
 npm ci
 npm run dev
 ```
 
-Open `http://localhost:4321/`. The About page is `http://localhost:4321/about/`.
-Use `http://localhost:4321/?pool=static` for the illustrated fallback. A WebGL2-capable browser normally selects the interactive pool automatically.
+Open `http://localhost:4321/`. Editing files in `src/` or `public/` rebuilds and reloads the page.
 
-Run `npm run build` to generate a fresh `dist/` production build, then serve it using `npm run preview`. The old Refresh `dist/` is deliberately omitted from V6.2 to avoid serving outdated HTML. Opening `index.html` directly with `file://` is unsupported because routes and assets use site-root URLs.
+Add `?pool=static` to the URL to see the fallback used without WebGL. Opening HTML files directly with `file://` is not supported, because routes and assets use site-root URLs.
 
-## Checks
+## Scripts
 
-```powershell
-npm run typecheck
-npm run build
-npm run test:content
-npx playwright install chromium
-npm run test:e2e
+| Command | What it does |
+| --- | --- |
+| `npm run dev` | Development server with live reload |
+| `npm run build` | Production build to `dist/` |
+| `npm run preview` | Serve `dist/` on port 4321 |
+| `npm run typecheck` | TypeScript checks |
+| `npm test` | Typecheck, build and content checks |
+| `npm run test:e2e` | Real-browser acceptance tests |
+| `npm run test:about` | About page layout checks |
+| `npm run test:v62:source` | Source-level content checks |
+| `npm run capture` | Screenshots to `test-results/capture/` |
+
+The browser scripts need Chromium once (`npx playwright install chromium`) and a fresh `npm run build`. `npm run capture -- --pages --gpu` includes the inner pages and uses your GPU.
+
+## Project structure
+
+```text
+src/
+  pages/        Home, About, Work, Life, 404 and the five case studies
+  components/   Document layout, cards, case-study parts
+  data/         All editable content
+  pool/         The WebGL pool: engine, shaders, floats, layout
+  client/       Browser entry points
+  ssg/          Route table and static renderer
+  styles/       main.css
+public/         Images, fonts and licences, copied as they are
+scripts/        Build, dev server and tests
+docs/           Architecture notes, design references, screenshots
 ```
 
-The first three checks passed in the *previous Refresh revision*, not in this V6.2 revision. V6.2 could not reinstall npm dependencies in this environment, so only offline source and asset checks were executed. See `QA_REPORT_V6_2.md`.
+## Editing content
 
-## What changed
+- `src/data/site.ts`: links, production origin, role preferences. A `null` link stays hidden.
+- `src/data/about.ts`: career, strengths, Life activities, photos and hiking regions.
+- `src/data/projects.ts`: the five projects and their card text.
+- `src/data/testimonials.ts`: the two authorised excerpts. `consent: false` stops one rendering.
+- `src/data/artifacts.ts`: optional medical booklet originals.
+- `src/pool/layout.ts`: where each float sits, in landscape and portrait.
 
-- Alpha-distance immersion, a refracted submerged-volume approximation, projected alpha-silhouette floor shadows with separable blur, softer caustics and a faceted origami boat.
-- Fixed the desktop-only collision constraint that incorrectly pushed portrait floats into the lower half. Portrait layout and runtime label avoidance are updated.
-- Same float art in the no-WebGL fallback; three viewport screenshots show that fallback, not the live shaders.
-- Supplied career narrative, specific decision evidence, seeking-opportunity details, approved life photos and two anonymous, consent-guarded user excerpts.
-- Real ATC homepage evidence, the retired medical-booklet experiment, a historical poster and one consolidated status/limits section per case.
-- `public/og.png`, with the name and tagline over a real static-pool screenshot.
-- More complete content and browser acceptance scripts. Existing npm dependency declarations are unchanged; a lockfile is included for repeatability.
+## Deployment
 
-## Edit content
+The site is designed for Cloudflare Pages:
 
-- `src/data/site.ts`: verified public links, production origin and role preferences. Null links stay hidden.
-- `src/data/about.ts`: career, strengths, approved photos, regions and unapproved metaphor.
-- `src/data/testimonials.ts`: only two authorized, original-wording excerpts. `consent: false` prevents rendering and is tested.
-- `src/data/artifacts.ts`: optional medical booklet originals and verification source.
-- `src/pool/layout.ts`: portrait/landscape object slots.
-- `src/pool/objects.ts`, `FloatShadows.ts`, `shaders.ts`: object and water rendering.
+- Build command: `npm run build`
+- Output directory: `dist`
+- Node version: 20.10 or newer
 
-The optional `scripts/generate-float-masks.py` is an authoring tool requiring Pillow, NumPy and SciPy. It is not needed to run or build the website: all five masks are supplied.
+The build generates the `_headers` (security policy, caching) and `_redirects` files Cloudflare reads. The repository contains no Cloudflare configuration, so confirm these settings in the Cloudflare dashboard. Deploy only with Martin's approval.
+
+`dist/` is tracked in git but out of date: it has not been updated since the first commit. Treat `npm run build` as the only source of `dist/`.
 
 ## Before launch
 
-The public contact email is **adapttochina@163.com**, confirmed by Martin. The final origin still needs to be configured. Group photos are visible in this local review build at Martin’s request; confirm third-party photo-release permission before publishing. Unconfirmed general account links and the proposed metaphor remain hidden. Retain the prototype, House Planner, ERP and FanScope boundaries. Follow `CONTENT_TODO.md`.
+- Set `site.origin` in `src/data/site.ts` to enable canonical URLs and the sitemap.
+- Confirm third-party permission for the group photos on the Life page.
+- Unconfirmed account links stay hidden until supplied.
+- Work through [CONTENT_TODO.md](CONTENT_TODO.md).
 
-Run `npm run test:e2e` after installing dependencies on Windows. Older QA and screenshot files included in the original Refresh belong to that historical build; `QA_REPORT_V6_2.md` is the current source-review report.
-
-
-### V6.2 content / layout refresh (2026-10-27)
-- About hero now features a first-person introduction and two education credential rows, including scholarships and **QS World University Rankings 2027** numbers linked to QS institution profiles. These are *overall university* rankings, not program rankings.
-- Meetfolio case study uses the provided application screenshot and the supplied repository URL (`https://github.com/MartinZhong2026/meetfolio`). **The URL could not be independently verified because GitHub returned 403 / account suspended** at check time; verify access before deployment.
-- About lifestyle image captions are transparent with small cyan labels. The requested five-photo running/hiking gallery is shown in this local package; confirm group-photo participant privacy before public deployment.
-- Government and CCTV-related work experience remains excluded; V6 pool, About composition, case-study routes and interactions otherwise stay untouched.
-
-## V6.4 visual refresh (October 27, 2026)
-
-The homepage places **Martin Zhong / welcome to my world** on the pool floor under the active WebGL surface. The five portfolio projects now float as thick, branded app icons; the original About origami boat remains. Source icon faces are at `public/assets/icons/`. New dated product screenshots are on the FanScope and Adapt to China case pages. The approved V6 About design is preserved.
-
-Please read `QA_REPORT_V6_4.md` before deploying. The provided homepage mockup under `docs/` is a **visual target**, not a screenshot captured from this code.
+`QA_REPORT*.md` and `VISUAL_QUALITY_NOTES.md` are historical records of earlier versions.
