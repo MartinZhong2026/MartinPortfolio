@@ -81,36 +81,9 @@ export function AboutHero({ onHome = false }: { onHome?: boolean }) {
     <>
       <section className="about-v6__hero" id="about" aria-labelledby="about-v6-title">
         <div className="wrap about-v6__hero-grid">
-          <div className="about-v6__hero-copy" data-reveal>
+          <div className="about-v6__hero-heading" data-reveal>
             <p className="about-v6__overline"><span className="about-v6__accent-dot" /> Hello, I'm Martin Zhong <span className="about-v6__overline-line" /> Shanghai, China</p>
             <H id="about-v6-title">Hi!<br />I am <em>Martin Zhong.</em></H>
-            <p className="about-v6__statement">
-              I turn real-world problems into practical AI products — from understanding people to building, testing,
-              and improving what they use.
-            </p>
-            <div className="about-v6__education-brief" aria-label="Education, rankings and scholarships">
-              <div className="about-v6__education-entry">
-                <span className="about-v6__education-years">2025.09 — 2028.03 · Expected</span>
-                <div className="about-v6__education-title"><strong>Shanghai Jiao Tong University</strong><a href="https://www.topuniversities.com/universities/shanghai-jiao-tong-university" target="_blank" rel="noopener noreferrer" aria-label="QS 2027 ranking for Shanghai Jiao Tong University">QS 2027 #36 ↗</a></div>
-                <p>Master of Public Administration · School of International and Public Affairs</p>
-                <span className="about-v6__education-award">First-Class Freshman Academic Scholarship</span>
-              </div>
-              <div className="about-v6__education-entry">
-                <span className="about-v6__education-years">2021.09 — 2025.06</span>
-                <div className="about-v6__education-title"><strong>Sun Yat-sen University</strong><a href="https://www.topuniversities.com/universities/sun-yat-sen-university" target="_blank" rel="noopener noreferrer" aria-label="QS 2027 ranking for Sun Yat-sen University">QS 2027 =258 ↗</a></div>
-                <p>Bachelor of Public Administration · GPA 3.73 / 4.0</p>
-                <span className="about-v6__education-award">Second-Class Outstanding Student Scholarship · Academic Progress Award</span>
-              </div>
-              <p className="about-v6__ranking-note">Rankings: QS World University Rankings 2027 · University-wide, not subject-specific.</p>
-            </div>
-            <div className="about-v6__actions">
-              <a className="btn btn--ink" href={onHome ? "#projects" : "/work/"}>Explore selected work <span aria-hidden="true">{onHome ? "↓" : "↗"}</span></a>
-              <a className="about-v6__text-link" href="#my-story">Get to know me <span aria-hidden="true">↓</span></a>
-              {site.contact.resume && <a className="about-v6__text-link" href={site.contact.resume}>Résumé <span aria-hidden="true">↗</span></a>}
-            </div>
-            <div className="about-v6__keywords" aria-label="Focus areas">
-              <span>Product thinking</span><span>AI applications</span><span>Human-centered research</span>
-            </div>
           </div>
           <figure className="about-v6__hero-portrait" data-reveal>
             <div className="about-v6__portrait-frame">
@@ -125,6 +98,34 @@ export function AboutHero({ onHome = false }: { onHome?: boolean }) {
             </div>
             <figcaption><span>01 / Portrait</span><span>Shanghai after dark, a city I call home.</span></figcaption>
           </figure>
+          <div className="about-v6__hero-copy" data-reveal>
+            <p className="about-v6__statement">
+              I connect an understanding of people and their needs with the ability to build practical software.
+            </p>
+            <div className="about-v6__education-brief" aria-label="Education, rankings and scholarships">
+              <div className="about-v6__education-entry">
+                <span className="about-v6__education-years">2025.09 — 2028.03 · Expected</span>
+                <div className="about-v6__education-title"><strong>Shanghai Jiao Tong University</strong><a href="https://www.topuniversities.com/universities/shanghai-jiao-tong-university" target="_blank" rel="noopener noreferrer" aria-label="QS 2027 ranking for Shanghai Jiao Tong University">QS 2027 #36 ↗</a></div>
+                <p>Master of Public Administration · School of International and Public Affairs</p>
+                <span className="about-v6__education-award">First Prize Scholarship</span>
+              </div>
+              <div className="about-v6__education-entry">
+                <span className="about-v6__education-years">2021.09 — 2025.06</span>
+                <div className="about-v6__education-title"><strong>Sun Yat-sen University</strong><a href="https://www.topuniversities.com/universities/sun-yat-sen-university" target="_blank" rel="noopener noreferrer" aria-label="QS 2027 ranking for Sun Yat-sen University">QS 2027 =258 ↗</a></div>
+                <p>Bachelor of Public Administration</p>
+                <span className="about-v6__education-award">Second Prize Scholarship</span>
+              </div>
+              <p className="about-v6__ranking-note">Rankings: QS World University Rankings 2027 · University-wide, not subject-specific.</p>
+            </div>
+            <div className="about-v6__actions">
+              <a className="btn btn--ink" href={onHome ? "#projects" : "/work/"}>Explore selected work <span aria-hidden="true">{onHome ? "↓" : "↗"}</span></a>
+              <a className="about-v6__text-link" href="#my-story">Get to know me <span aria-hidden="true">↓</span></a>
+              {site.contact.resume && <a className="about-v6__text-link" href={site.contact.resume}>Résumé <span aria-hidden="true">↗</span></a>}
+            </div>
+            <div className="about-v6__keywords" aria-label="Focus areas">
+              <span>Product thinking</span><span>AI applications</span><span>Human-centered research</span>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -174,22 +175,31 @@ export function AboutStory() {
               that interest grew into a habit of looking past assumptions and asking what people actually need.
             </p>
             <p>
-              Working in consumer insights at Mintel trained me to organize messy information, notice meaningful
-              patterns, and communicate findings clearly. But I wanted to go beyond understanding the problem.
-              I wanted to build something that could help.
+              <a href="/work/adapt-to-china/">Adapt to China</a> began as a question: how could everyday life in
+              China become less complicated for people arriving from elsewhere? I founded and continue to operate
+              the platform as a small, focused independent venture combining AI assistance with hands-on human support.
             </p>
             <p>
-              That shift led to <a href="/work/adapt-to-china/">Adapt to China</a>, a platform combining practical
-              information, AI assistance, and human support for people navigating life in China. It also led to
-              <a href="/work/meetfolio/"> Meetfolio</a> and enterprise prototypes, where I have had to confront the
-              unglamorous details behind useful software: unreliable outputs, unclear requirements, approval steps,
-              and the difference between a good demo and a dependable workflow.
+              I handle product development, understanding user needs, communication, and service delivery. The work
+              ranges from housing search and rental assistance to pet care, reservations and bookings,
+              Chinese-language phone calls, and practical guidance on everyday life in China. With 5,000+ Instagram views
+              and real service requests, the project has taught me that useful products are defined by whether
+              they help someone complete the next step.
+            </p>
+            <p>
+              More recently, at YBBE TECH, I have been bringing that hands-on approach into enterprise software.
+              I work across product discovery, AI-assisted development, and workflow prototyping: understanding
+              client needs, turning ambiguous requirements into product specifications, and building and testing
+              software that teams can evaluate and improve.
+            </p>
+            <p>
+              Collaborating across product, engineering, and business functions, I work on research and laboratory
+              workflow prototypes such as <a href="/work/abtrace/">AbTrace</a> and explore meeting intelligence and
+              <a href="/work/supplier-document-intelligence/"> document-processing workflows</a>. These are prototypes
+              that teams can evaluate before production deployment. The experience has made me more attentive to
+              clear requirements, technical constraints, human review, system reliability, and communication across roles.
             </p>
           </div>
-          <p className="about-v6__story-copy">
-            At YBBE TECH, I’m extending that learning into enterprise settings: clarifying workflows, communicating
-            across roles and languages, and prototyping AI tools for real business conversations.
-          </p>
           <div className="about-v6__path" aria-label="Education and career timeline">
             {career.map(item => <div key={item.organization}>
               <span className="about-v6__path-label">{item.years}</span><strong>{item.organization}</strong>

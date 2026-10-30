@@ -9,7 +9,7 @@ const aboutData = await read('src/data/about.ts');
 const meetfolio = await read('src/pages/cases/Meetfolio.tsx');
 const css = await read('src/styles/main.css');
 assert(about.includes('Hi!<br />I am <em>Martin Zhong.</em>'), 'New About title missing');
-for(const q of ['QS 2027 #36','QS 2027 =258','First-Class Freshman Academic Scholarship','Second-Class Outstanding Student Scholarship']) assert(about.includes(q),q);
+for(const q of ['QS 2027 #36','QS 2027 =258','First Prize Scholarship','Second Prize Scholarship']) assert(about.includes(q),q);
 for(const q of ['Sun Yat-sen University','Shanghai Jiao Tong University','2025.09','2021.09']) assert(about.includes(q),q);
 for(const q of ['meetfolio/workspace-demo-20261027.webp','https://github.com/MartinZhong2026/meetfolio']) assert(meetfolio.includes(q),q);
 assert(about.includes('<figcaption><span>{photo.title}</span></figcaption>'), 'Transparent photo-caption markup missing');

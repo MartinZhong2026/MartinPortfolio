@@ -64,7 +64,14 @@ for (const route of allPages) {
 }
 const about = await readFile(join(dist, 'about/index.html'), 'utf8');
 assert(about.includes('shanghai-run-group') && about.includes('hiking-group'), 'Requested five-photo About gallery incomplete');
-assert(about.includes('YBBE TECH') && about.includes('Mintel') && about.includes('2028'));
+assert(about.includes('YBBE TECH') && about.includes('2028'));
+for (const html of [about, home]) {
+  assert(!/Mintel|Career International|GPA|Academic Progress Award|First-Class|Second-Class/.test(html), 'Outdated About content rendered');
+  for (const text of ['First Prize Scholarship', 'Second Prize Scholarship', '5,000+ Instagram views', 'founded and continue to operate', 'AI Product &amp; Software Development']) assert(html.includes(text), `Approved About copy missing: ${text}`);
+  const timeline = html.match(/aria-label="Education and career timeline"[\s\S]*?<\/section>/)?.[0];
+  assert(timeline);
+  assert.deepEqual([...timeline.matchAll(/<strong>(.*?)<\/strong>/g)].map(m => m[1]), ['Sun Yat-sen University', 'Shanghai Jiao Tong University', 'Adapt to China', 'YBBE TECH']);
+}
 assert(about.includes('mailto:adapttochina@163.com'), 'Confirmed public email missing');
 assert(about.includes('>adapttochina@163.com</a>'), 'Public email address not visible on About');
 assert(!(await stat(join(dist, 'contact/index.html')).then(() => true, () => false)), 'Standalone Contact page should not exist');
