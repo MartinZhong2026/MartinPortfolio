@@ -71,6 +71,15 @@ try {
     await checkLabels(page);
     for(const slug of slugs) assert(await page.locator(`a[href="/work/${slug}/"]`).count());
     for(const place of places) assert.equal(await page.locator(`.pool__objects a[href="/${place}/"]`).count(),1,`Pool link missing: ${place}`);
+    // The call to action: visible without scrolling, big enough to tap, and clear of the water.
+    const cta=await page.locator('.pool__cta').boundingBox();
+    const frame=await page.locator('.pool__frame').boundingBox();
+    assert.equal(await page.locator('.pool__cta').getAttribute('href'),'/work/');
+    assert((await page.locator('.pool__cta').textContent()).includes('Dive into my world'));
+    assert(cta.y+cta.height<=viewport.height,`CTA is below the first screen at ${viewport.width}px`);
+    assert(cta.height>=40&&cta.x>=0&&cta.x+cta.width<=viewport.width,`CTA size or position is off at ${viewport.width}px`);
+    assert(cta.y>=frame.y+frame.height-2,'CTA must not cover the pool');
+    assert((await page.locator('.pool__hint').innerText()).includes('floating object'),'Instruction missing');
     // Compare to the device width: on phones, innerWidth grows with wide content.
     const fits=()=>page.evaluate(w=>document.documentElement.scrollWidth<=w+1,viewport.width);
     assert(await fits(),'Horizontal overflow');
@@ -101,7 +110,14 @@ try {
     await page.goto(`${origin}/about/`,{waitUntil:'networkidle'});
     await page.waitForTimeout(900);
     await page.screenshot({path:`test-results/about-${viewport.width}.png`,fullPage:true});
-    assert(await page.locator('text=YBBE TECH').count());
+    assert.equal(await page.locator('text=/YBBE|Mintel|Career International/').count(),0,'Employer history must not appear on About');
+    // The story: a collage of real images beside the essay on wide screens, stacked on phones.
+    await page.locator('.story-collage').scrollIntoViewIfNeeded();
+    await page.waitForFunction(()=>[...document.querySelectorAll('.story-collage img')].every(i=>i.complete&&i.naturalWidth>0),null,{timeout:15000});
+    const story=await page.evaluate(()=>{const r=s=>document.querySelector(s).getBoundingClientRect();const c=r('.story-collage'),e=r('.story-grid .about-v6__chapter-main');return{c:{x:c.x,right:c.right,y:c.y,bottom:c.bottom},e:{x:e.x,right:e.right,y:e.y},n:document.querySelectorAll('.story-collage img').length,w:innerWidth};});
+    assert.equal(story.n,4,'Collage should show four real images');
+    if(viewport.width>900) assert(story.c.right<=story.e.x+1,`Collage must sit left of the essay at ${viewport.width}px`);
+    else assert(story.c.bottom<=story.e.y+1&&story.c.x>=0&&story.c.right<=viewport.width,`Collage must stack above the essay without overflow at ${viewport.width}px`);
     assert(await fits(),'Horizontal overflow on About');
     await page.goto(`${origin}/life/`,{waitUntil:'networkidle'});
     await page.locator('#gallery').scrollIntoViewIfNeeded();
@@ -188,7 +204,7 @@ try {
   for (const slug of slugs) assert.equal(await staticPage.locator(`.pool__objects a[href="/work/${slug}/"]`).count(),1, `No-JS pool link missing: ${slug}`);
   await nojs.close();
   const page=await browser.newPage(); await page.goto(`${origin}/?pool=static`); await page.waitForSelector('.pool--unsupported');
-  await page.locator('.pool__list-link').click(); await page.waitForURL('**/work/');
+  await page.locator('.pool__cta').click(); await page.waitForURL('**/work/');
   await page.locator('.cards a[href="/work/meetfolio/"]').click(); await page.waitForURL('**/work/meetfolio/');
   await page.goto(`${origin}/work/`); await page.locator('[data-filter="client"]').click();
   assert.equal(await page.locator('[data-filter-list] > li:visible').count(),2);

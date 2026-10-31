@@ -1,9 +1,3 @@
-export const career = [
-  { years: 'Sep 2021 – Jun 2025', organization: 'Sun Yat-sen University', role: 'Bachelor of Public Administration', detail: 'QS World University Rankings 2027 =258 · Second Prize Scholarship. A foundation in social science and understanding everyday needs.', transition: null },
-  { years: 'Sep 2025 – Mar 2028 (expected)', organization: 'Shanghai Jiao Tong University', role: 'Master of Public Administration · School of International and Public Affairs', detail: 'QS World University Rankings 2027 #36 · First Prize Scholarship. Connecting research and an understanding of people with practical product work.', transition: null },
-  { years: 'Jul 2026 – Present', organization: 'Adapt to China', role: 'Founder · Independent AI + Human Services Venture', detail: 'I build and operate a small venture helping foreigners navigate everyday life in China, from software and user needs to communication and hands-on service delivery.', transition: 'Real service requests connect research, software, and the responsibility of helping someone take the next step.' },
-  { years: 'Oct 2026 – Present', organization: 'YBBE TECH', role: 'AI Product & Software Development', detail: 'Translating client needs into specifications and AI-assisted enterprise prototypes, including AbTrace and document-processing workflows, for teams to test and evaluate.', transition: null },
-];
 export const strengths = [
   { title: 'Find the real problem', description: 'Start with people, evidence and context. Discover the constraint that actually matters.', evidence: 'Housing needs become a budget, commute and service brief.', href: '/work/adapt-to-china/#journey' },
   { title: 'Make ideas tangible', description: 'Turn ambiguous requests into something people can try, question and improve.', evidence: 'AbTrace turns a module list into role-based research tasks.', href: '/work/abtrace/' },
@@ -23,5 +17,25 @@ export const lifeActivities = [
   { id: 'fitness', title: 'Fitness', line: 'I also enjoy strength training.', notes: [] },
   { id: 'hiking', title: 'Hiking', line: 'Hiking takes me somewhere unfamiliar.', notes: [`Trails across ${hikingRegions.length} provinces & regions, and the feeling of being a beginner somewhere unfamiliar.`] },
   { id: 'drawing', title: 'Drawing', line: 'Drawing makes me pay attention.', notes: ['My own pen sketch of Hong Kong. A way to look a little longer.'] },
+];
+/**
+ * Layered visuals beside the story on About. Every image is a real project
+ * screenshot, logo or personal drawing from public/. To add one, append an entry:
+ * the collage reflows by itself. `kind` sets how it is framed and how wide it is.
+ */
+export interface CollageItem {
+  kind: 'browser' | 'phone' | 'photo' | 'logo';
+  src: string;
+  width: number;
+  height: number;
+  alt: string;
+  caption: string;
+  href?: string;
+}
+export const storyCollage: CollageItem[] = [
+  { kind: 'browser', src: '/assets/adapt/live-homepage.jpg', width: 1700, height: 932, alt: 'Adapt to China homepage: “What do you need to figure out today?” with a search box and quick topics.', caption: 'Adapt to China · the live site', href: '/work/adapt-to-china/' },
+  { kind: 'phone', src: '/assets/adapt/atc-ai-chat-20261027.webp', width: 900, height: 1671, alt: 'ATC AI on mobile: General and House Planner (Testing) modes, asking “What do you need help with in China?”', caption: 'The ATC AI assistant', href: '/work/adapt-to-china/' },
+  { kind: 'photo', src: '/assets/about/hong-kong-sketch.jpg', width: 1536, height: 957, alt: 'Martin’s original ink sketch of the Hong Kong skyline at Victoria Peak in June 2024.', caption: 'My sketch · Victoria Peak', href: '/life/#gallery' },
+  { kind: 'logo', src: '/assets/icons/adapt-to-china.png', width: 512, height: 512, alt: 'Adapt to China logo: the Oriental Pearl Tower and Shanghai skyline above the words Live, Learn, Belong.', caption: 'Live · Learn · Belong', href: '/work/adapt-to-china/' },
 ];
 export const poolMetaphor = null as string | null; // TODO(Martin): approve “Learning a new place, with a little support.”

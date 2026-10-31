@@ -3239,7 +3239,7 @@ h3, h4 { font-family: var(--font-serif); font-weight: 700; letter-spacing: -0.00
 .page-home .site-header { pointer-events: none; }
 .page-home .site-header a { pointer-events: auto; }
 .pool {
-  --fw-l: min(calc(100vw - 48px), calc((100svh - 34px - 62px) * 1.8), 1560px);
+  --fw-l: min(calc(100vw - 48px), calc((100svh - 34px - 78px) * 1.8), 1560px);
   --fw: max(var(--fw-l), 480px);
   --fh: calc(var(--fw) / 1.8);
   min-height: max(100svh, calc(var(--fh) + 96px));
@@ -3427,4 +3427,124 @@ h1, h2, h3, h4, .nav, .btn, .brand { word-spacing: normal; }
 }
 @media (max-width: 480px) {
   .btn { white-space: normal; }
+}
+
+/* ========================================================================
+   V12 — Home call to action, About story with a visual collage
+   ======================================================================== */
+
+/* Home: one clear next step under the pool. The hint explains the floats; the
+   button says where the rest of the site is. */
+.pool__bar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  column-gap: 20px;
+  flex-wrap: initial;
+}
+.pool__hint { justify-self: start; font-size: 15px; }
+.pool__status { justify-self: end; text-align: right; font-size: 14px; max-width: 34ch; }
+.pool__cta {
+  justify-self: center;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 26px;
+  border-radius: 999px;
+  background: var(--ink);
+  color: #fff;
+  font-family: var(--font-editorial);
+  font-size: 18px;
+  letter-spacing: 0.01em;
+  text-decoration: none;
+  white-space: nowrap;
+  box-shadow: 0 14px 26px -14px rgba(15, 35, 64, 0.8), 0 0 0 3px rgba(255, 253, 248, 0.9);
+  transition: transform 0.25s var(--ease), box-shadow 0.25s var(--ease), background 0.2s;
+}
+.pool__cta span { color: #7fe3f2; transition: transform 0.25s var(--ease); }
+.pool__cta:hover { transform: translateY(-2px); background: #0b1b33; }
+.pool__cta:hover span { transform: translateX(4px); }
+.pool__cta:focus-visible { outline: 3px solid var(--aqua); outline-offset: 4px; }
+@media (max-aspect-ratio: 5/6) {
+  .pool__bar { display: flex; flex-wrap: wrap; justify-content: center; row-gap: 8px; }
+  .pool__cta { order: -1; font-size: 19px; padding: 12px 28px; }
+  .pool__hint, .pool__status { justify-self: center; width: 100%; text-align: center; max-width: none; }
+}
+
+/* About: the story is a two-column spread. Visuals layer on the left; the essay
+   reads on the right in Special Elite. */
+.about-v6__chapter { display: block; padding-top: 100px; padding-bottom: 110px; }
+.about-v6__chapter .about-v6__section-label { margin-bottom: 34px; }
+.story-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.82fr) minmax(0, 1fr);
+  gap: clamp(36px, 6vw, 96px);
+  align-items: start;
+}
+.story-grid .about-v6__chapter-main { min-width: 0; }
+.about-v6__chapter-main h2 { margin-bottom: 14px; }
+.story-question {
+  font-family: var(--font-editorial);
+  font-weight: 400;
+  font-size: clamp(18px, 1.7vw, 22px);
+  line-height: 1.38;
+  letter-spacing: 0;
+  color: var(--aqua-deep);
+  max-width: 34ch;
+  margin: 0 0 30px;
+  padding-left: 14px;
+  border-left: 3px solid var(--sun);
+}
+.about-v6__story-copy { max-width: 62ch; }
+.about-v6__story-copy p { margin-bottom: 1.3em; }
+
+/* The collage grows downwards: each picture takes its own row, slides to the
+   left or right edge, and tucks under the one above. Append to storyCollage in
+   src/data/about.ts and it reflows. */
+.story-collage { position: sticky; top: 28px; display: grid; grid-template-columns: minmax(0, 1fr); padding: 0 4px 14px; isolation: isolate; }
+.sc-link { display: block; text-decoration: none; color: inherit; margin-top: -7%; position: relative; z-index: 1; transition: transform 0.4s var(--ease); }
+.sc-link:first-child { margin-top: 0; }
+.sc-link:nth-child(odd) { justify-self: start; --tilt: -1.4deg; }
+.sc-link:nth-child(even) { justify-self: end; --tilt: 1.6deg; }
+.sc-link:nth-child(2) { z-index: 2; }
+.sc-link:nth-child(3) { z-index: 3; }
+.sc-link:nth-child(4) { z-index: 4; }
+.sc-link:nth-child(n + 5) { z-index: 5; }
+a.sc-link:hover { transform: translateY(-4px); }
+a.sc-link:focus-visible { outline: 3px solid var(--aqua); outline-offset: 4px; }
+.sc { margin: 0; position: relative; overflow: hidden; background: #fff; border-radius: 14px; transform: rotate(var(--tilt, 0deg)); box-shadow: 0 2px 0 rgba(15, 35, 64, 0.04), 0 26px 40px -24px rgba(15, 35, 64, 0.5); border: 1px solid var(--line); }
+.sc img { display: block; width: 100%; height: auto; }
+.sc figcaption {
+  position: absolute; left: 10px; bottom: 10px; max-width: calc(100% - 20px);
+  padding: 3px 10px; border-radius: 999px;
+  background: rgba(255, 253, 248, 0.92);
+  font: 400 13px/1.3 var(--font-editorial);
+  color: var(--ink);
+}
+.sc-link--browser { width: 88%; }
+.sc-link--phone { width: 36%; }
+.sc-link--photo { width: 72%; }
+.sc-link--logo { width: 34%; }
+.sc__bar { height: 24px; display: flex; align-items: center; gap: 6px; padding: 0 12px; background: var(--paper-2); border-bottom: 1px solid var(--line); }
+.sc__bar i { width: 8px; height: 8px; border-radius: 50%; background: var(--line-2); }
+.sc--phone { border: 6px solid #15181d; border-radius: 26px; background: #15181d; }
+.sc--phone img { border-radius: 19px; }
+.sc--phone figcaption { display: none; }
+.sc--photo { background: #f3eee2; }
+.sc--logo { border-radius: 50%; padding: 10px; background: #fbf8f1; aspect-ratio: 1; }
+.sc--logo img { border-radius: 50%; height: 100%; object-fit: contain; }
+.sc--logo figcaption { display: none; }
+
+@media (max-width: 900px) {
+  .about-v6__chapter { padding-top: 70px; padding-bottom: 78px; }
+  .story-grid { grid-template-columns: minmax(0, 1fr); gap: 34px; }
+  .story-collage { position: static; max-width: 520px; width: 100%; margin: 0 auto; }
+  .sc-link { margin-top: -6%; }
+}
+@media (max-width: 480px) {
+  .sc-link--browser { width: 92%; }
+  .sc-link--phone { width: 40%; }
+  .sc--phone { border-width: 5px; border-radius: 22px; }
+  .sc figcaption { font-size: 12px; }
+  .story-question { max-width: none; }
 }

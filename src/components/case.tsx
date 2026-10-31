@@ -60,7 +60,7 @@ export function ProjectSheet({
   users: string;
   problems: string[];
   role: string;
-  links?: { href: string; label: string }[];
+  links?: { href: string; label: string; aria?: string }[];
   images?: SheetImage[];
   visual?: ReactNode;
   layout?: 'stack' | 'phones' | 'desktop-phone' | 'desktop-phones' | 'logo-visual';
@@ -109,7 +109,7 @@ export function ProjectSheet({
           </dl>
           <div className="sheet__links">
             {links.map((l) => (
-              <a key={l.href} className="btn btn--accent" href={l.href} target="_blank" rel="noopener noreferrer">
+              <a key={l.href} className="btn btn--accent" href={l.href} target="_blank" rel="noopener noreferrer" aria-label={`${l.aria ?? l.label} (opens in a new tab)`}>
                 {l.label} <ExternalArrow />
               </a>
             ))}

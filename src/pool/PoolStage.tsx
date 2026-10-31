@@ -241,17 +241,17 @@ export function PoolStage() {
         </div>
         <div className="pool__bar">
           <p className="pool__hint">
-            <span className="hint-fine">Stir the water with your cursor. Click anything floating to explore.</span>
-            <span className="hint-coarse">Tap anything floating to explore. Drag to make a ripple.</span>
+            <span className="hint-fine">Click a floating object to explore.</span>
+            <span className="hint-coarse">Tap a floating object to explore.</span>
           </p>
+          <a className="pool__cta" href="/work/">
+            Dive into my world <span aria-hidden="true">→</span>
+          </a>
           <p className="pool__status" role="status" aria-live="polite">
             {mode === 'loading' && 'Getting the pool ready…'}
             {mode === 'unsupported' &&
               "The interactive pool isn't available on this device. Every project is still one tap away."}
           </p>
-          <a className="pool__list-link" href="/work/">
-            View projects as a list <span aria-hidden="true">→</span>
-          </a>
         </div>
       </div>
       <div className="pool__wipe" ref={wipeRef} aria-hidden="true" />

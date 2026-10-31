@@ -39,6 +39,9 @@ try {
       for (const path of ['about', 'work', 'life']) {
         await page.goto(`${origin}/${path}/`, { waitUntil: 'networkidle' });
         await page.evaluate(() => document.querySelectorAll('[data-reveal]').forEach((e) => e.classList.add('is-in')));
+        // Walk down the page so lazy images load before the full-page shot.
+        await page.evaluate(async () => { for (let y = 0; y < document.body.scrollHeight; y += 500) { window.scrollTo(0, y); await new Promise((r) => setTimeout(r, 60)); } window.scrollTo(0, 0); });
+        await page.waitForFunction(() => [...document.images].every((i) => i.complete));
         await page.waitForTimeout(900);
         await page.screenshot({ path: `${out}/${path}-${v.name}.png`, fullPage: true });
       }

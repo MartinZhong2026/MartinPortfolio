@@ -4,6 +4,8 @@ import { CasePage, ExternalArrow, ProjectSheet, Tag, type TagKind } from '../../
 
 const p = projectBySlug('adapt-to-china');
 const SITE = 'https://adapttochina.com/';
+const BLOG = 'https://adapttochina.com/blog/';
+const AI = 'https://adapttochina.com/aichatbox';
 const STORY = 'https://adapttochina.com/blog/from-social-science-to-ai-products/';
 
 const stages: { h: string; p: string; tag: [TagKind, string] }[] = [
@@ -30,8 +32,9 @@ export function AdaptToChina() {
         ]}
         role="Founder (since July 2026) · user research · product strategy · content · AI-assisted development · operations"
         links={[
-          { href: SITE, label: 'Visit Adapt to China' },
-          { href: STORY, label: "Read the founder's story" },
+          { href: SITE, label: 'Visit Website', aria: 'Visit the Adapt to China website' },
+          { href: BLOG, label: 'Explore the Blog', aria: 'Explore the Adapt to China blog' },
+          { href: AI, label: 'Try the AI Assistant', aria: 'Try the Adapt to China AI assistant' },
         ]}
         showNext={false}
         layout="desktop-phone"
@@ -88,7 +91,7 @@ export function AdaptToChina() {
                   <li><strong>Honest by design.</strong> “AI can make mistakes. Check important details.” A person helps when an answer is not enough.</li>
                 </ul>
               </div>
-              <a className="btn btn--accent atc2__try" href="https://adapttochina.com/aichatbox" target="_blank" rel="noopener noreferrer">
+              <a className="btn btn--accent atc2__try" href={AI} target="_blank" rel="noopener noreferrer" aria-label="Try ATC AI (opens in a new tab)">
                 Try ATC AI <ExternalArrow />
               </a>
             </div>
@@ -114,8 +117,8 @@ export function AdaptToChina() {
               not evidence of recurring revenue or scale.
             </p>
             <div className="sheet__links">
-              <a className="btn btn--accent" href={SITE} target="_blank" rel="noopener noreferrer">
-                Visit Adapt to China <ExternalArrow />
+              <a className="btn btn--accent" href={STORY} target="_blank" rel="noopener noreferrer" aria-label="Read the founder’s story (opens in a new tab)">
+                Read the founder’s story <ExternalArrow />
               </a>
               <a className="btn btn--ghost" href="/work/meetfolio/">
                 Next: Meetfolio <span aria-hidden="true">→</span>

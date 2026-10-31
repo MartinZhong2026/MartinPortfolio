@@ -1,6 +1,7 @@
 import { filterLabels, projects } from '../data/projects';
 import { site } from '../data/site';
-import { career, strengths, hikingRegions, lifeActivities, lifePhotos } from '../data/about';
+import { strengths, hikingRegions, lifeActivities, lifePhotos, storyCollage } from '../data/about';
+import { story } from '../data/story';
 import { ProjectCard } from '../components/ProjectCard';
 
 /* ----------------------------------------------------------------- HOME */
@@ -113,7 +114,7 @@ export function AboutHero() {
 export function AboutProof() {
   return (
     <>
-      <section className="about-v6__proof wrap" aria-label="Selected experience and work">
+      <section className="about-v6__proof wrap" aria-label="Selected work">
         <a href="/work/adapt-to-china/" className="about-v6__proof-item">
           <span className="about-v6__proof-index">01 / Venture</span>
           <strong>Adapt to China</strong>
@@ -143,46 +144,26 @@ export function AboutStory() {
     <>
       <section className="about-v6__chapter wrap" id="my-story" aria-labelledby="about-v6-story">
         <div className="about-v6__section-label" data-reveal><span>01</span> / The story so far</div>
-        <div className="about-v6__chapter-main" data-reveal>
-          <h2 id="about-v6-story">From studying systems<br />to <span>building solutions.</span></h2>
-          <div className="about-v6__story-copy">
-            <p>
-              I started in public administration, learning to ask how institutions, services, and incentives affect
-              everyday life. At Sun Yat-sen University and now as a master’s student at Shanghai Jiao Tong University,
-              that interest grew into a habit of looking past assumptions and asking what people actually need.
-            </p>
-            <p>
-              <a href="/work/adapt-to-china/">Adapt to China</a> began as a question: how could everyday life in
-              China become less complicated for people arriving from elsewhere? I founded and continue to operate
-              the platform as a small, focused independent venture combining AI assistance with hands-on human support.
-            </p>
-            <p>
-              I handle product development, understanding user needs, communication, and service delivery. The work
-              ranges from housing search and rental assistance to pet care, reservations and bookings,
-              Chinese-language phone calls, and practical guidance on everyday life in China. With 5,000+ Instagram views
-              and real service requests, the project has taught me that useful products are defined by whether
-              they help someone complete the next step.
-            </p>
-            <p>
-              More recently, at YBBE TECH, I have been bringing that hands-on approach into enterprise software.
-              I work across product discovery, AI-assisted development, and workflow prototyping: understanding
-              client needs, turning ambiguous requirements into product specifications, and building and testing
-              software that teams can evaluate and improve.
-            </p>
-            <p>
-              Collaborating across product, engineering, and business functions, I work on research and laboratory
-              workflow prototypes such as <a href="/work/abtrace/">AbTrace</a> and explore meeting intelligence and
-              <a href="/work/supplier-document-intelligence/"> document-processing workflows</a>. These are prototypes
-              that teams can evaluate before production deployment. The experience has made me more attentive to
-              clear requirements, technical constraints, human review, system reliability, and communication across roles.
-            </p>
-          </div>
-          <div className="about-v6__path" aria-label="Education and career timeline">
-            {career.map(item => <div key={item.organization}>
-              <span className="about-v6__path-label">{item.years}</span><strong>{item.organization}</strong>
-              <small>{item.role}</small><p>{item.detail}</p>
-              {item.transition && <small className="career-transition">{item.transition}</small>}
-            </div>)}
+        <div className="story-grid">
+          <aside className="story-collage" aria-label="Pictures from the projects and drawings mentioned in the story" data-reveal>
+            {storyCollage.map((item) => {
+              const figure = (
+                <figure className={`sc sc--${item.kind}`}>
+                  {item.kind === 'browser' && <div className="sc__bar" aria-hidden="true"><i /><i /><i /></div>}
+                  <img src={item.src} width={item.width} height={item.height} alt={item.alt} loading="lazy" decoding="async" />
+                  <figcaption>{item.caption}</figcaption>
+                </figure>
+              );
+              const cls = `sc-link sc-link--${item.kind}`;
+              return item.href ? <a key={item.src} className={cls} href={item.href}>{figure}</a> : <div key={item.src} className={cls}>{figure}</div>;
+            })}
+          </aside>
+          <div className="about-v6__chapter-main" data-reveal>
+            <h2 id="about-v6-story">From studying systems <br />to <span>building solutions.</span></h2>
+            <h3 className="story-question">{story.question}</h3>
+            <div className="about-v6__story-copy">
+              {story.paragraphs.map((text) => <p key={text}>{text}</p>)}
+            </div>
           </div>
         </div>
       </section>

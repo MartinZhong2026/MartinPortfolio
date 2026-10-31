@@ -17,6 +17,7 @@ export function FanScope() {
           'Trend charts usually hide what is missing; FanScope shows sample size, missing data and coverage next to every chart.',
         ]}
         role="Product direction · research workflow design · data modelling · source investigation · AI-assisted development"
+        links={[{ href: 'https://fanscope.pages.dev/', label: 'Explore FanScope', aria: 'Explore FanScope, the research-intelligence workbench' }]}
         layout="desktop-phones"
         images={[
           {
