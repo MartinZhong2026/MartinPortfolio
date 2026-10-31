@@ -134,7 +134,7 @@ Before launch, set `site.origin` in `src/data/site.ts` to enable canonical URLs 
 
 | Command | Covers |
 | --- | --- |
-| `npm test` | Types, build, and `check-content.mjs`: routes, content rules, consent, images, fonts, the About essay against its approved copy, no employer history on About, and the exact external links on Adapt to China and FanScope |
+| `npm test` | Types, build, and `check-content.mjs`: routes, content rules, consent, images, fonts, the About essay against its approved copy, no employer or internship references on any page, and the exact external links on Adapt to China and FanScope |
 | `npm run test:e2e` | Chromium with software WebGL at 1440, 1024 and 390 wide: live pool, pixel checks on water colour, brightness spread (the neon guard) and the name, float hover and click, nav, one-screen Home, fonts, labels, keyboard, reduced motion, no-JS, fallback, redirects, filters, 404 |
 | `npm run test:about` | About reading order and layout at four viewports |
 | `npm run test:v62:source` | Source-level checks of approved content |

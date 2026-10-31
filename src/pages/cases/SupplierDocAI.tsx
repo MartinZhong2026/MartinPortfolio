@@ -16,7 +16,7 @@ export function SupplierDocAI() {
           'A generic AI extraction shows a neat result, but not where each value came from or whether two documents disagree.',
           'Re-typing data into ERP is slow — yet automating it must not hide who checked and approved the change.',
         ]}
-        role="Requirements analysis · product flow · AI-assisted prototyping · evidence design · testing (client project at YBBE TECH, anonymised)"
+        role="Requirements analysis · product flow · AI-assisted prototyping · evidence design · testing (enterprise client prototype, anonymised)"
         layout="logo-visual"
         images={[{ src: '/assets/icons/document-ai.png', width: 512, height: 512, frame: 'logo', alt: 'Document AI app icon: document lines with an AI badge.' }]}
         visual={

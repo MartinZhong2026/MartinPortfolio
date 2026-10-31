@@ -83,8 +83,11 @@ const renderedParagraphs = [...storyHtml.matchAll(/<p>([\s\S]*?)<\/p>/g)].map((m
 assert.deepEqual(renderedParagraphs, approved.slice(2), 'Story paragraphs differ from the approved copy');
 console.log(`✓ About story matches the approved copy exactly (${renderedParagraphs.length} paragraphs)`);
 assert(!/about-v6__path|Education and career timeline/.test(about), 'Career timeline is still on About');
-for (const html of [about, home]) assert(!/YBBE|Mintel|Career International/i.test(html), 'Employer history is still on About or Home');
-console.log('✓ About and Home carry no YBBE TECH, Mintel or Career International history');
+for (const route of allPages) {
+  const html = await readFile(join(dist, route), 'utf8');
+  assert(!/YBBE|Mintel|Career International|interns?|internships?|employer/i.test(html), `Employer or internship reference on ${route}`);
+}
+console.log('✓ No employer or internship references on any page');
 
 // External links: exact destinations, opening safely in a new tab.
 const external = [['work/adapt-to-china/index.html', ['https://adapttochina.com/', 'https://adapttochina.com/blog/', 'https://adapttochina.com/aichatbox']], ['work/fanscope/index.html', ['https://fanscope.pages.dev/']]];

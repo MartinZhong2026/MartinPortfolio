@@ -16,7 +16,7 @@ export function AbTrace() {
           'Revisions and approvals get lost between documents and people.',
           'Scientific rules are easy to hard-code wrongly — the prototype keeps them provisional and reviewable by domain experts.',
         ]}
-        role="Discovery conversations · requirements translation · UI and workflow design · prototype development and testing (client project at YBBE TECH, anonymised)"
+        role="Discovery conversations · requirements translation · UI and workflow design · prototype development and testing (enterprise client prototype, anonymised)"
         layout="logo-visual"
         images={[{ src: '/assets/abtrace/logo.webp', width: 900, height: 900, frame: 'logo', alt: 'AbTrace app logo: a stylised letter A joined by connected nodes.' }]}
         visual={

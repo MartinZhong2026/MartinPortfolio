@@ -22,8 +22,8 @@ export const site = {
   lookingFor: {
     roles: 'AI product, enterprise software, product strategy and customer-facing technical solutions',
     locations: 'Shanghai · Hong Kong · International teams',
-    timing: 'Summer internships in 2027 · Graduation expected March 2028',
-    availability: null as string | null, // TODO(Martin): role-specific start date; current internship is four days a week.
+    timing: 'Open to AI product opportunities and collaborations',
+    availability: null as string | null, // TODO(Martin): availability or start date, if you want one shown.
   },
   footer:
     '© 2026 Martin Zhong. Designed and built with AI-assisted tools, iteration, and plenty of debugging.',

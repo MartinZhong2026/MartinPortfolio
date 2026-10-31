@@ -102,7 +102,7 @@ Read the Pool section of [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) before cha
 - The no-JavaScript and no-WebGL pool, `prefers-reduced-motion`, keyboard focus and skip link.
 - Published content rules enforced by `scripts/check-content.mjs`: only the confirmed email, only consented testimonials verbatim, no excluded experience, every image with `alt` and dimensions, one status/limits section per case.
 - Honest claims: prototypes stay labelled as prototypes. Do not invent metrics, quotes or links.
-- The About essay is approved copy. Never rewrite, shorten or add to `scripts/fixtures/about-story.md`; `check-content` fails on any difference. About carries no employer or internship history. External links to Adapt to China and FanScope are fixed destinations, opened with `target="_blank" rel="noopener noreferrer"`.
+- The About essay is approved copy. Never rewrite, shorten or add to `scripts/fixtures/about-story.md`; `check-content` fails on any difference. No public page carries employer or internship references; project case studies describe client work neutrally ("enterprise client prototype"). External links to Adapt to China and FanScope are fixed destinations, opened with `target="_blank" rel="noopener noreferrer"`.
 
 ## Verifying visual work
 
