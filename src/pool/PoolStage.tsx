@@ -70,6 +70,15 @@ export function PoolStage() {
           fx: poolFx(),
           ids: poolItems.map((i) => i.id),
           onHover: (id) => setActive(id),
+          plantFits: (x, y, r) => {
+            const cr = canvasRef.current!.getBoundingClientRect();
+            const c = { x: x + cr.left, y: y + cr.top, r: r * 0.8 };
+            if (c.x - c.r < 0 || c.x + c.r > cr.right || c.y - c.r < 0 || c.y + c.r > cr.bottom) return false;
+            return ![...document.querySelectorAll('.site-header nav, .brand, .pool__hint')].some((el) => {
+              const b = el.getBoundingClientRect();
+              return Math.hypot(Math.max(b.left - c.x, 0, c.x - b.right), Math.max(b.top - c.y, 0, c.y - b.bottom)) < c.r;
+            });
+          },
           onActivate: (id) => go(id),
           onFirstFrame: () => {
             if (!cancelled) {

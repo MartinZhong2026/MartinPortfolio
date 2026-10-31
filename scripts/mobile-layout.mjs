@@ -58,6 +58,19 @@ async function inspect({ samples }) {
         if (Math.hypot(a.float.x - toy.x, a.float.y - toy.y) < (a.float.r + toy.r) * 0.85) bad.add(`toy ${t} on float: ${a.name}`);
       }
     }
+    // Planters stay on the deck, on screen, and clear of the navigation and the ladder.
+    const box = (el) => { const r = el.getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height }; };
+    const nav = box(document.querySelector('.site-header nav')), brand = box(document.querySelector('.brand'));
+    const water = { x: f.x, y: f.y, w: f.width, h: f.height };
+    const ladder = (() => { const a = pool.project(-1.6, -0.87), b = pool.project(-1.6, -0.46); return { x: Math.min(a.x, b.x) + canvas.left, y: a.y + canvas.top - 34, w: Math.abs(a.x - b.x), h: 70 }; })();
+    for (const [p, plant] of pool.plants().entries()) {
+      const c = { x: plant.x + canvas.left, y: plant.y + canvas.top, r: plant.r };
+      if (near(nav, c, 0.72)) bad.add(`plant ${p} on navigation`);
+      if (near(brand, c, 0.72)) bad.add(`plant ${p} on brand`);
+      if (near(ladder, c, 0.72)) bad.add(`plant ${p} on ladder`);
+      if (hit({ x: c.x - 1, y: c.y - 1, w: 2, h: 2 }, water)) bad.add(`plant ${p} in the water`);
+      if (c.x - c.r * 0.72 < 0 || c.x + c.r * 0.72 > innerWidth) bad.add(`plant ${p} cut by the screen edge`);
+    }
     for (const [t, toy] of toys.entries()) {
       if (near(cta, toy, 0.9)) bad.add(`toy ${t} on CTA`);
       if (near(name, toy, 0.75)) bad.add(`toy ${t} on name`);
@@ -77,6 +90,8 @@ try {
     const page = await context.newPage();
     await page.goto(`${origin}/?poolfx=probe`, { waitUntil: 'networkidle' });
     await page.waitForFunction(() => document.documentElement.dataset.pool === 'live' && window.__pool, null, { timeout: 120000 });
+    // Phones must never use the mesh caustic map: see docs/INCIDENTS.md.
+    assert.equal(await page.evaluate(() => window.__pool.usesCausticMap), false, 'Touch devices must use analytic caustics');
     const { bad, smallest } = await page.evaluate(inspect, { samples });
     await page.screenshot({ path: `test-results/mobile/${width}x${height}@${dpr}.png` });
     console.log(`${bad.length ? 'FAIL' : 'pass'} ${width}x${height} @${dpr}  smallest float ${smallest.toFixed(0)}px${bad.length ? '\n     ' + bad.join('\n     ') : ''}`);

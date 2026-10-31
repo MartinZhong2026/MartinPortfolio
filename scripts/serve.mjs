@@ -64,5 +64,7 @@ export function startServer({ port = 4321, host = '127.0.0.1', onRequest } = {})
 if (import.meta.url === `file://${process.argv[1]}` || process.argv[1]?.endsWith('serve.mjs')) {
   const i = process.argv.indexOf('--port');
   const port = i > -1 ? Number(process.argv[i + 1]) : 4321;
-  startServer({ port }).then(() => console.log(`Serving dist/ at http://localhost:${port}`));
+  const h = process.argv.indexOf('--host');
+  const host = h > -1 ? process.argv[h + 1] : undefined; // 0.0.0.0 lets a phone on the same Wi-Fi connect
+  startServer({ port, host }).then(() => console.log(`Serving dist/ at http://${host ?? 'localhost'}:${port}`));
 }

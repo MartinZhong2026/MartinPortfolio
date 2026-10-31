@@ -301,6 +301,27 @@ vec3 faceNormal(vec3 p) {
 
 ${leafGlsl}
 
+#ifdef ANALYTIC_CAUSTICS
+// Sunlight ribbons from a formula of position and time, with no render target,
+// no mesh and no wave input, so it cannot jump between frames. Adapted from the
+// pool at e06f666. Phones use this: see docs/INCIDENTS.md before replacing it.
+float ambientCaustics(vec2 p, float t) {
+  vec2 q = p * 11.0;
+  vec2 warp = vec2(
+    0.52 * sin(q.y * 0.62 + t * 0.47) + 0.20 * cos(q.y * 1.27 - t * 0.29),
+    0.48 * cos(q.x * 0.70 - t * 0.39) + 0.24 * sin(q.x * 1.17 + t * 0.34)
+  );
+  q += warp;
+  float a = sin(q.x * 1.13 + 0.62 * sin(q.y * 0.76 + t * 0.22));
+  float b = sin(q.y * 0.98 + 0.74 * sin(q.x * 0.73 - t * 0.31));
+  float joint = sin(q.x * 0.61 - q.y * 0.74 + t * 0.25);
+  float filament = 1.0 - smoothstep(0.03, 0.3, abs(a * b + 0.18 * joint));
+  float smaller = 1.0 - smoothstep(0.05, 0.28, abs(a - b) * 0.65);
+  float modulation = 0.72 + 0.28 * sin(q.x * 0.41 + q.y * 0.39 + t * 0.16);
+  return clamp((filament * 0.72 + smaller * 0.28) * modulation, 0.0, 1.0);
+}
+#endif
+
 // Colour of a point on the pool's interior surface (floor or walls).
 vec3 poolSurface(vec3 p, bool underwater) {
   vec3 n = faceNormal(p);
@@ -329,6 +350,9 @@ vec3 poolSurface(vec3 p, bool underwater) {
   // wall the map is empty, which is what draws the wall's shadow on the floor.
   float t = (p.y + depth) / rl.y;
   vec2 q = p.xz - rl.xz * t;
+#ifdef ANALYTIC_CAUSTICS
+  vec3 focus = vec3(0.9 + 1.05 * ambientCaustics(q, poolTime));
+#else
   vec2 cuv = q / halfSize * 0.5 + 0.5;
   vec2 spread = normalize(rl.xz + 1e-4) * 0.0028;
   // Water disperses a little: split the focus lines by wavelength.
@@ -337,6 +361,7 @@ vec3 poolSurface(vec3 p, bool underwater) {
     texture2D(causticTex, clamp(cuv, 0.0, 1.0)).r,
     texture2D(causticTex, clamp(cuv - spread, 0.0, 1.0)).r
   ) * 4.0;
+#endif
   // Light comes and goes in patches as the longer swell passes over.
   float drift = sin(q.x * 1.7 + q.y * 0.9 + poolTime * 0.11) * sin(q.y * 2.3 - q.x * 0.7 - poolTime * 0.09);
   float strength = 0.62 + 0.38 * smoothstep(-0.7, 0.7, drift);
@@ -363,13 +388,8 @@ uniform vec3 light;
 uniform vec2 halfSize;
 uniform float depth;
 uniform float focusGain;
-#ifdef VERTEX_AREA
-uniform vec2 gridStep; // world distance between grid vertices
-varying float gather;
-#else
 varying vec3 oldPos;
 varying vec3 newPos;
-#endif
 
 vec3 projectToFloor(vec3 origin, vec3 ray) {
   float t = (-depth - origin.y) / ray.y;
@@ -390,32 +410,15 @@ vec3 landing(vec2 p) {
 
 void main() {
   vec3 lands = landing(position.xz);
-#ifdef VERTEX_AREA
-  // How much a small patch of light shrinks on its way down. Measured here from
-  // neighbouring vertices, so the result never depends on how a GPU computes
-  // screen-space derivatives on the thin triangles along a focus line.
-  vec2 dx = vec2(gridStep.x, 0.0), dz = vec2(0.0, gridStep.y);
-  vec3 across = landing(position.xz + dx) - landing(position.xz - dx);
-  vec3 along = landing(position.xz + dz) - landing(position.xz - dz);
-  float area = abs(across.x * along.z - across.z * along.x) / (4.0 * gridStep.x * gridStep.y);
-  gather = 1.0 / max(area, 0.05);
-#else
   vec3 refractedLight = refract(-light, vec3(0.0, 1.0, 0.0), IOR_AIR / IOR_WATER);
   oldPos = projectToFloor(vec3(position.x, 0.0, position.z), refractedLight);
   newPos = lands;
-#endif
   gl_Position = vec4(lands.x / halfSize.x, lands.z / halfSize.y, 0.0, 1.0);
 }
 `;
 
 export const causticsFrag = /* glsl */ `
 precision highp float;
-#ifdef VERTEX_AREA
-varying float gather;
-void main() {
-  gl_FragColor = vec4(gather * 0.25, 0.0, 0.0, 1.0);
-}
-#else
 varying vec3 oldPos;
 varying vec3 newPos;
 void main() {
@@ -423,7 +426,6 @@ void main() {
   float newArea = length(dFdx(newPos)) * length(dFdy(newPos));
   gl_FragColor = vec4(min(oldArea / max(newArea, 1e-7), 8.0) * 0.25, 0.0, 0.0, 1.0);
 }
-#endif
 `;
 
 export const waterVert = /* glsl */ `

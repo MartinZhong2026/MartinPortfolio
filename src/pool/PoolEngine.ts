@@ -17,6 +17,7 @@ import {
   waterVert,
 } from './shaders';
 import { FloatShadows } from './FloatShadows';
+import { buildPlanting, type Planting } from './plants';
 import { builders, toyBuilders, disposeObjectResources, type BuiltObject } from './objects';
 import { toySlots, landscapeLayout, POOL, portraitLayout, type PoolObjectId, type Slot } from './layout';
 
@@ -34,6 +35,8 @@ export interface EngineOptions {
   ids: PoolObjectId[];
   onHover(id: PoolObjectId | null): void;
   onActivate(id: PoolObjectId): void;
+  /** Has the page room for a planter at this canvas position? */
+  plantFits(x: number, y: number, r: number): boolean;
   onFrame(anchors: Map<PoolObjectId, Anchor>, portrait: boolean, cta: { x: number; y: number }): void;
   onFirstFrame(): void;
   onContextLost(): void;
@@ -101,8 +104,11 @@ export class PoolEngine {
   /** seconds for the caustic map to catch up with the water */
   private causticSettle: number;
   private causticSeeded = false;
-  /** blur radius in map texels; the touch grid is already soft */
-  private causticSoft: number;
+  /**
+   * Touch devices draw sunlight from a formula instead of the projected mesh map.
+   * Do not route phones back through the map: see docs/INCIDENTS.md.
+   */
+  private useCausticMap: boolean;
   /** wave speed. Slower on touch devices, where each frame jump costs most. */
   private windRate: number;
   /** accumulated wave time, so the rate can change without the waves jumping */
@@ -120,6 +126,7 @@ export class PoolEngine {
   private shared: Record<string, THREE.IUniform>;
   private objects: ObjState[] = [];
   private hits: THREE.Object3D[] = [];
+  private planting: Planting;
   private floatShadows: FloatShadows;
   private drops: THREE.Vector4[] = [];
   private raycaster = new THREE.Raycaster();
@@ -181,12 +188,12 @@ export class PoolEngine {
     this.rtA = new THREE.WebGLRenderTarget(simW, simH, rtOpts);
     this.rtB = new THREE.WebGLRenderTarget(simW, simH, rtOpts);
     // Deliberately small: the map is blurred, and low resolution helps it stay soft.
-    const cRes = opts.coarse ? 384 : 512;
+    this.useCausticMap = opts.fx.has('analytic-caustics') ? false : !opts.coarse || opts.fx.has('map-caustics');
+    const cRes = !this.useCausticMap ? 2 : opts.coarse ? 384 : 512;
     this.causticRT = new THREE.WebGLRenderTarget(cRes, Math.round((cRes * L) / W), rtOpts);
     this.causticRaw = new THREE.WebGLRenderTarget(cRes, Math.round((cRes * L) / W), rtOpts);
     this.causticScratch = new THREE.WebGLRenderTarget(cRes, Math.round((cRes * L) / W), rtOpts);
-    this.causticSettle = opts.coarse ? 0.09 : 0.05;
-    this.causticSoft = opts.coarse ? 0.3 : 0.55;
+    this.causticSettle = 0.05;
     this.windRate = opts.coarse ? 0.55 : 1;
     this.causticBlur = new THREE.ShaderMaterial({
       vertexShader: fullscreenVert,
@@ -299,9 +306,7 @@ export class PoolEngine {
         halfSize: this.shared.halfSize,
         depth: this.shared.depth,
         focusGain: { value: 9.5 },
-        gridStep: { value: new THREE.Vector2((2 * W) / simW, (2 * L) / simH) },
       },
-      defines: opts.coarse ? { VERTEX_AREA: 1 } : {},
       blending: THREE.AdditiveBlending,
       transparent: true,
       side: THREE.DoubleSide,
@@ -313,7 +318,9 @@ export class PoolEngine {
     this.causticScene.add(cMesh);
 
     // --- Visible scene -------------------------------------------------
+    const causticDefines: Record<string, number> = this.useCausticMap ? {} : { ANALYTIC_CAUSTICS: 1 };
     this.waterMat = new THREE.ShaderMaterial({
+      defines: causticDefines,
       vertexShader: waterVert,
       fragmentShader: waterFrag,
       uniforms: {
@@ -334,6 +341,7 @@ export class PoolEngine {
     this.scene.add(water);
 
     this.poolMat = new THREE.ShaderMaterial({
+      defines: causticDefines,
       vertexShader: poolVert,
       fragmentShader: poolFrag,
       uniforms: { ...this.shared },
@@ -385,6 +393,9 @@ export class PoolEngine {
       const rail = new THREE.Mesh(new THREE.TubeGeometry(railCurve, 28, 0.017, 10, false), railMat);
       this.scene.add(rail);
     }
+
+    this.planting = buildPlanting();
+    this.scene.add(this.planting.group);
 
     // --- Objects -------------------------------------------------------
     const addFloat = (id: PoolObjectId | null, built: BuiltObject, slots: ObjState['slots']) => {
@@ -439,10 +450,20 @@ export class PoolEngine {
       renderer: this.renderer,
       causticRT: this.causticRT,
       drop: (x: number, z: number, radius: number, strength: number) => this.queueDrop(x, z, radius, strength),
+      usesCausticMap: this.useCausticMap,
       project: (x: number, z: number) => {
         const p = new THREE.Vector3(x, 0, z).project(this.camera);
         return { x: (p.x * 0.5 + 0.5) * this.cw, y: (-p.y * 0.5 + 0.5) * this.ch };
       },
+      // Each planter's place and reach on screen, for overlap tests.
+      plants: () =>
+        this.planting.spots().map((s) => {
+          const c = new THREE.Vector3(s.x, RIM, s.z).project(this.camera);
+          const e = new THREE.Vector3(s.x, RIM, s.z).addScaledVector(new THREE.Vector3(1, 0, 0).applyQuaternion(this.camera.quaternion), s.reach).project(this.camera);
+          const x = (c.x * 0.5 + 0.5) * this.cw;
+          const y = (-c.y * 0.5 + 0.5) * this.ch;
+          return { x, y, r: Math.hypot((e.x * 0.5 + 0.5) * this.cw - x, (-e.y * 0.5 + 0.5) * this.ch - y) };
+        }),
       // Every toy's place and size on screen, for overlap tests.
       toys: () =>
         this.objects
@@ -708,6 +729,13 @@ export class PoolEngine {
     this.ndcShift.set((f.x + f.w / 2 - cw / 2) / (cw / 2), -(f.y + f.h / 2 - ch / 2) / (ch / 2));
     this.placeCamera();
 
+    this.planting.place(portrait, this.shared.light.value, (x, z, reach) => {
+      const c = new THREE.Vector3(x, RIM, z).project(this.camera);
+      const e = new THREE.Vector3(x, RIM, z).addScaledVector(new THREE.Vector3(1, 0, 0).applyQuaternion(this.camera.quaternion), reach).project(this.camera);
+      const sx = (c.x * 0.5 + 0.5) * cw;
+      const sy = (-c.y * 0.5 + 0.5) * ch;
+      return this.opts.plantFits(sx, sy, Math.hypot((e.x * 0.5 + 0.5) * cw - sx, (-e.y * 0.5 + 0.5) * ch - sy));
+    });
     if (changed) {
       for (const o of this.objects) {
         const slot = portrait ? o.slots.portrait : o.slots.landscape;
@@ -790,6 +818,7 @@ export class PoolEngine {
     }
 
     this.updateObjects(dt);
+    if (!rm) this.planting.animate(this.time);
 
     // --- Simulation passes
     const r = this.renderer;
@@ -809,31 +838,7 @@ export class PoolEngine {
     this.pass(this.normalMat);
 
     // --- Caustics
-    const u = this.causticBlur.uniforms;
-    this.causticMat.uniforms.water.value = this.rtA.texture;
-    r.setRenderTarget(this.causticRaw);
-    r.setClearColor(0x000000, 1);
-    r.clear();
-    r.render(this.causticScene, this.simCam);
-    // Soften it in two passes, sharing the fullscreen quad with the simulation.
-    this.simQuad.material = this.causticBlur;
-    u.settle.value = 1;
-    u.tex.value = this.causticRaw.texture;
-    u.direction.value.set(this.causticSoft / this.causticRaw.width, 0);
-    r.setRenderTarget(this.causticScratch);
-    r.render(this.simScene, this.simCam);
-    // Focus lines move several of their own widths between frames. Shown as they
-    // are, each line jumps, and a long thin jump reads as a flash. So the visible
-    // map eases towards the latest one over a fixed time, at any frame rate.
-    u.settle.value = this.causticSeeded && dt > 0 ? 1 - Math.exp(-dt / this.causticSettle) : 1;
-    this.causticSeeded = true;
-    u.tex.value = this.causticScratch.texture;
-    u.direction.value.set(0, this.causticSoft / this.causticRT.height);
-    r.setRenderTarget(this.causticRT);
-    const autoClear = r.autoClear;
-    r.autoClear = false;
-    r.render(this.simScene, this.simCam);
-    r.autoClear = autoClear;
+    if (this.useCausticMap) this.updateCausticMap(dt);
 
     // --- Main view
     this.floatShadows.render();
@@ -850,6 +855,35 @@ export class PoolEngine {
       this.opts.onFirstFrame();
     }
     if (!still) this.adaptQuality(dt);
+  }
+
+  private updateCausticMap(dt: number) {
+    const r = this.renderer;
+    const u = this.causticBlur.uniforms;
+    this.causticMat.uniforms.water.value = this.rtA.texture;
+    r.setRenderTarget(this.causticRaw);
+    r.setClearColor(0x000000, 1);
+    r.clear();
+    r.render(this.causticScene, this.simCam);
+    // Soften it in two passes, sharing the fullscreen quad with the simulation.
+    this.simQuad.material = this.causticBlur;
+    u.settle.value = 1;
+    u.tex.value = this.causticRaw.texture;
+    u.direction.value.set(0.55 / this.causticRaw.width, 0);
+    r.setRenderTarget(this.causticScratch);
+    r.render(this.simScene, this.simCam);
+    // Focus lines move several of their own widths between frames. Shown as they
+    // are, each line jumps, and a long thin jump reads as a flash. So the visible
+    // map eases towards the latest one over a fixed time, at any frame rate.
+    u.settle.value = this.causticSeeded && dt > 0 ? 1 - Math.exp(-dt / this.causticSettle) : 1;
+    this.causticSeeded = true;
+    u.tex.value = this.causticScratch.texture;
+    u.direction.value.set(0, 0.55 / this.causticRT.height);
+    r.setRenderTarget(this.causticRT);
+    const autoClear = r.autoClear;
+    r.autoClear = false;
+    r.render(this.simScene, this.simCam);
+    r.autoClear = autoClear;
   }
 
   private pass(mat: THREE.ShaderMaterial) {
@@ -1045,7 +1079,6 @@ export class PoolEngine {
       // Never refresh the light less often: that is what makes it flash. A slow
       // device takes bigger steps, so the light moves slower and softer instead.
       this.causticSettle = 0.16;
-      this.causticSoft = 0.55;
       this.windRate = Math.min(this.windRate, 0.34);
     } else {
       this.frameTimes.length = 201; // nothing left to give up
@@ -1089,6 +1122,7 @@ export class PoolEngine {
     this.rippleTex.dispose();
     this.envRT?.dispose();
     this.floorTypeTex.dispose();
+    this.planting.dispose();
     this.leafTex.dispose();
     this.floatShadows.dispose();
     this.renderer.dispose();
