@@ -32,19 +32,20 @@ export const landscapeLayout: Record<PoolObjectId, Slot> = {
 export const portraitLayout: Record<PoolObjectId, Slot> = {
   meetfolio: { sx: -0.5, sy: -0.68, yaw: -0.16, size: 1.06 },
   abtrace: { sx: 0.48, sy: -0.7, yaw: 0.16, size: 1.06 },
-  fanscope: { sx: 0.58, sy: 0.42, yaw: 0.12, size: 1.06 },
-  'adapt-to-china': { sx: 0.42, sy: 0.82, yaw: 0.08, size: 0.94 },
-  'supplier-document-intelligence': { sx: -0.54, sy: 0.82, yaw: -0.1, size: 1.06 },
+  fanscope: { sx: 0.6, sy: 0.53, yaw: 0.12, size: 1.0 },
+  'adapt-to-china': { sx: 0.34, sy: 0.86, yaw: 0.08, size: 0.88 },
+  'supplier-document-intelligence': { sx: -0.56, sy: 0.86, yaw: -0.1, size: 1.0 },
   about: { sx: -0.6, sy: -0.34, yaw: 0.16, size: 1.0 },
-  life: { sx: -0.64, sy: 0.42, yaw: 0, size: 0.96 },
+  life: { sx: -0.66, sy: 0.5, yaw: 0, size: 0.92 },
 };
 
-/** Decorative rubber ducks: no links, just company. They wander around these. */
-export const duckSlots: { landscape: Slot; portrait: Slot }[] = [
-  { landscape: { sx: -0.8, sy: -0.7, yaw: 0.9, size: 1 }, portrait: { sx: 0.02, sy: -0.86, yaw: 0.9, size: 1.15 } },
+/** Decorative toys: no links, just company. They wander around these. */
+export const toySlots: { landscape: Slot; portrait: Slot }[] = [
+  { landscape: { sx: -0.8, sy: -0.7, yaw: 0.9, size: 1 }, portrait: { sx: 0.02, sy: -0.86, yaw: 0.9, size: 1.1 } },
   { landscape: { sx: 0.0, sy: -0.72, yaw: -0.5, size: 1 }, portrait: { sx: 0.8, sy: -0.14, yaw: -0.5, size: 1.15 } },
-  { landscape: { sx: 0.04, sy: 0.88, yaw: 2.5, size: 1 }, portrait: { sx: -0.04, sy: 0.56, yaw: 2.5, size: 1.1 } },
-  { landscape: { sx: 0.84, sy: -0.62, yaw: 1.8, size: 1 }, portrait: { sx: 0.12, sy: -0.4, yaw: 1.8, size: 1.1 } },
+  { landscape: { sx: 0.24, sy: 0.98, yaw: 2.5, size: 1 }, portrait: { sx: -0.1, sy: 0.66, yaw: 2.5, size: 1.05 } },
+  { landscape: { sx: 0.84, sy: -0.66, yaw: 1.8, size: 1 }, portrait: { sx: 0.14, sy: -0.56, yaw: 1.8, size: 1.1 } },
+  { landscape: { sx: 0.88, sy: 0.5, yaw: -2.2, size: 1 }, portrait: { sx: 0.84, sy: 0.74, yaw: 1.2, size: 0.92 } },
 ];
 
 export const POOL = {

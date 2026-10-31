@@ -154,7 +154,7 @@ export function AboutStory() {
                   <figcaption>{item.caption}</figcaption>
                 </figure>
               );
-              const cls = `sc-link sc-link--${item.kind}`;
+              const cls = `sc-link sc-link--${item.kind}${item.tuck ? ' sc-link--tuck' : ''}`;
               return item.href ? <a key={item.src} className={cls} href={item.href}>{figure}</a> : <div key={item.src} className={cls}>{figure}</div>;
             })}
           </aside>
