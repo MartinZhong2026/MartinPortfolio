@@ -52,7 +52,8 @@ docs/           Architecture notes, design references, screenshots
 ## Editing content
 
 - `src/data/site.ts`: links, production origin, role preferences. A `null` link stays hidden.
-- `src/data/about.ts`: career, strengths, Life activities, photos and hiking regions.
+- `src/data/about.ts`: strengths, Life activities, photos, hiking regions and the About collage images.
+- `scripts/fixtures/about-story.md`: Martin's approved About essay. Edit it, then run `node scripts/gen-story.mjs` to regenerate `src/data/story.ts`.
 - `src/data/projects.ts`: the five projects and their card text.
 - `src/data/testimonials.ts`: the two authorised excerpts. `consent: false` stops one rendering.
 - `src/data/artifacts.ts`: optional medical booklet originals.

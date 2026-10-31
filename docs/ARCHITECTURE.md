@@ -28,8 +28,10 @@ There is no client-side router: links are full page loads. Same-origin cross-fad
 
 - `src/components/Layout.tsx` renders the full document, header, footer and skip link. The primary nav comes from `nav` in `src/data/site.ts`.
 - `src/pages/pages.tsx` holds the top-level pages. About is composed of `AboutHero`, `AboutProof`, `AboutStory`, `AboutStrengths` and `AboutClosing`.
+- **About story.** `AboutStory` is a two-column spread: a collage of real images (`storyCollage` in `about.ts`) beside the essay. The essay is Martin's approved copy, kept in `scripts/fixtures/about-story.md` and turned into `src/data/story.ts` by `scripts/gen-story.mjs`, so the page cannot drift from it. The collage grows downwards: each image takes its own row, alternates left and right, and tucks under the one above, so appending an entry to `storyCollage` reflows it without CSS changes. `kind` (`browser`, `phone`, `photo`, `logo`) sets its frame and width. On phones it stacks above the essay.
+- **Home call to action.** `PoolStage` renders a "Dive into my world →" link to `/work/` in the bar under the pool, flanked by the instruction line. It sits outside the water, so it never covers the name or a float. On portrait screens the bar stacks with the button first.
 - `src/components/case.tsx` provides the case-study building blocks used by `src/pages/cases/`.
-- Content lives in `src/data/`: `site.ts` (links, origin, roles), `projects.ts` (the five projects), `about.ts` (career, strengths, Life content, photos), `testimonials.ts` (consent-gated quotes), `artifacts.ts` (optional originals).
+- Content lives in `src/data/`: `site.ts` (links, origin, roles), `projects.ts` (the five projects), `about.ts` (strengths, Life content, photos, the About collage), `story.ts` (the About essay, generated), `testimonials.ts` (consent-gated quotes), `artifacts.ts` (optional originals).
 
 ## The pool
 
@@ -132,7 +134,7 @@ Before launch, set `site.origin` in `src/data/site.ts` to enable canonical URLs 
 
 | Command | Covers |
 | --- | --- |
-| `npm test` | Types, build, and `check-content.mjs`: routes, content rules, consent, images, fonts |
+| `npm test` | Types, build, and `check-content.mjs`: routes, content rules, consent, images, fonts, the About essay against its approved copy, no employer history on About, and the exact external links on Adapt to China and FanScope |
 | `npm run test:e2e` | Chromium with software WebGL at 1440, 1024 and 390 wide: live pool, pixel checks on water colour, brightness spread (the neon guard) and the name, float hover and click, nav, one-screen Home, fonts, labels, keyboard, reduced motion, no-JS, fallback, redirects, filters, 404 |
 | `npm run test:about` | About reading order and layout at four viewports |
 | `npm run test:v62:source` | Source-level checks of approved content |

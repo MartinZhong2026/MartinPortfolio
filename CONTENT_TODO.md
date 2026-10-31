@@ -4,7 +4,7 @@ Updated 27 October 2026. The approved V6 design and routes remain the baseline.
 
 ## Supplied and integrated
 
-- Education, Career International, Mintel, Adapt to China and YBBE TECH dates and roles are in `src/data/about.ts`.
+- About presents education, scholarships and rankings plus Martin's approved essay (`scripts/fixtures/about-story.md`). It carries no employer or internship history; the Work case studies keep their own project status and role lines.
 - The TWO authorized anonymous quotations are verbatim excerpts in `src/data/testimonials.ts`, with `consent: true`. No other comments or raw chat screenshots are displayed.
 - The supplied real ATC homepage and historical poster are included with distinct captions. The poster is historical, including its earlier domain.
 - Personal running, Jing’an 10 km and original June 2024 Victoria Peak sketch are displayed. Group photos remain disabled until consent is confirmed.
