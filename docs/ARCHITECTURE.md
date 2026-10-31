@@ -62,18 +62,14 @@ There is no client-side router: links are full page loads. Same-origin cross-fad
 - **Caustics**, through `causticsVert`, which multiplies slope by `focusGain` because the pool is shallow, then limits steep slopes so a stirred pool stays soft. The result is physically derived, not a painted pattern. Past the sun-side wall no light lands, which is what draws the wall's shadow.
 - **Buoyancy**, through `swellAt()`, a CPU copy of the longest three waves.
 
-The caustic map is deliberately small (512 wide, 384 on touch devices) and blurred. `poolSurface()` samples it three times, offset by wavelength for slight dispersion, breaks it into slow patches, and rolls off the peaks. Tiles are lit as ambient plus that sun term. The brightest light is added as white rather than multiplied into the tile colour, which is what keeps it from reading as neon cyan.
+On desktop the caustic map is deliberately small (512 wide) and blurred. `poolSurface()` samples it three times, offset by wavelength for slight dispersion, breaks it into slow patches, and rolls off the peaks. Tiles are lit as ambient plus that sun term. The brightest light is added as white rather than multiplied into the tile colour, which is what keeps it from reading as neon cyan.
 
-#### Caustics and flicker
+#### Two caustic paths
 
-Focus lines are thin and bright, and they travel several of their own widths between frames. Shown as they are, a line jumps, and a long thin jump reads as a flash. On phones the crests of the longest wave lie at about +40° on a portrait screen, so the flashes ran upper-left to lower-right. Four things prevent this:
+- **Touch devices** define `ANALYTIC_CAUSTICS` and draw sunlight from `ambientCaustics()`, a formula of position and time. There is no render target, mesh or wave input, and the map passes do not run. This is deliberate: see [INCIDENTS.md](INCIDENTS.md).
+- **Desktop** uses the projected map. `causticRaw` holds the latest map, and the sampled `causticRT` eases towards it over `causticSettle`, because focus lines jump between frames. Never refresh it less than once a frame. `adaptQuality()` lengthens the settling and slows the waves on slow machines. `windClock` accumulates time, so the rate can change smoothly.
 
-- **Settling.** `causticRaw` holds the latest map. The map the pool samples, `causticRT`, eases towards it over a fixed time (`causticSettle`), whatever the frame rate.
-- **Every frame.** The map refreshes on every frame. Never refresh it less often to save time: that is what caused the flashes. `adaptQuality()` slows the waves (`windRate`) and lengthens the settling instead. `windClock` accumulates time, so the rate can change without the waves jumping.
-- **Slower waves on touch devices.** `windRate` is 0.55 there, and buoyancy reads the same clock, so the floats stay in step with the water.
-- **No derivatives on touch devices.** Under `VERTEX_AREA`, `causticsVert` measures how much light gathers from neighbouring vertices, so the result does not depend on how a GPU computes `dFdx` on thin triangles. Desktop keeps the derivative path.
-
-Lane edges are anti-aliased for the same reason: seen through moving water, a hard edge flips whole rows of pixels at once.
+`?poolfx=map-caustics` and `?poolfx=analytic-caustics` force either path for testing. Touch devices also run the waves at 0.55 speed, and buoyancy reads the same clock. Lane edges are anti-aliased, because a hard edge seen through moving water flips whole rows of pixels.
 
 `waterFrag` then adds absorption, in-scattering, deeper colour towards the walls, Fresnel sky reflection, sun glitter, and the contact effects below. `rippleTex` is a tiling slope map built once by `buildRippleMap()`. Two scrolling samples give the surface fine detail at a fixed cost, and it never reaches the caustics.
 
@@ -102,6 +98,10 @@ Geometry above `WATERLINE_Y` is discarded from the footprint, so only what actua
 
 Portrait is a fixed composition, because a narrow pool has no room to spare. Each slot in `portraitLayout` names the side its label is pinned to (`pinLabel()`), so a label never searches for a spot. Project floats may leave their home by only `CELL_FLOAT` and toys by `CELL_TOY`, and a toy gives way entirely when it meets a project float. Keep this in mind when moving a slot: run `npm run test:mobile`, which measures every pair of objects.
 
+### Planting
+
+`plants.ts` builds three stone planters of leaves and flowers. Each planter's foliage merges into one vertex-coloured mesh, so the arrangement costs a few draw calls and no extra passes. `POSES` holds positions for each orientation, because the top of the screen is a different side of the pool in portrait. On resize, `PoolStage.plantFits` checks each planter against the header, the instruction line and the screen edge, and a planter with no room hides. They have no hit target and do not affect the water.
+
 ### Lighting
 
 One `light` direction is used by caustics, shadows, the directional light and a procedural sky dome baked to an environment map, so reflections agree with shadows. The sun sits high and to the side so its mirror image, the glitter zone, stays off the name. The camera is tilted (`TILT_LANDSCAPE`, `TILT_PORTRAIT`) so the far wall and the sides of the floats show, and `resize()` backs it off until the near rim fits the frame. In portrait the camera turns 90°, so `resize()` turns the sun with it to keep shadows falling screen lower-right. Palm shadows come from a small canvas (`paintFoliage`) sampled by the deck and pool floor shaders. Water and deck output display-referred colour directly; Three.js materials use Neutral tone mapping so brand colours hold.
@@ -116,7 +116,7 @@ One `light` direction is used by caustics, shadows, the directional light and a 
 - The loop stops when the canvas is off-screen or the tab is hidden.
 - Pixel ratio is capped at 2, or 1.5 on touch devices. Touch devices also use smaller targets.
 - Water shaders read textures instead of looping over objects, so floats add draw calls but no per-pixel cost.
-- `adaptQuality()` measures after warm-up. Under 40 fps it drops the pixel ratio to 1, then slows and softens the light. Resizing clears the canvas, so both it and `resize()` redraw straight away, or the browser would show a blank frame.
+- `adaptQuality()` measures after warm-up. Under 40 fps it drops the pixel ratio to 1, then slows the light. Resizing clears the canvas, so both it and `resize()` redraw straight away, or the browser would show a blank frame.
 
 ## Assets, fonts and styling
 

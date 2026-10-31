@@ -4,7 +4,11 @@ Automated checks run in desktop browsers with device emulation. They cannot repr
 
 ## Setup
 
-Use the deployed site or a preview URL. To use a local build, run `npm run build`, then `npx serve dist` or any static server reachable from the phone over the same network.
+Use a preview URL if the branch has one. Otherwise, with the phone on the same Wi-Fi as the computer:
+
+1. Run `npm run build`, then `npm run preview -- --host 0.0.0.0`. Allow it through the firewall if asked.
+2. Find the computer's address with `ipconfig` (IPv4 Address).
+3. On the phone, open `http://<that address>:4321/`.
 
 Replace `<site>` below with that address.
 
@@ -27,6 +31,8 @@ Each address turns one effect off. Repeat step 1 on each and note where the flas
 | `<site>/?poolfx=no-fine` | Fine surface ripples |
 | `<site>/?poolfx=no-rings` | Ripple rings around floats |
 | `<site>/?poolfx=no-leaf` | Palm shadows |
+
+Two more switches compare the sunlight paths. `?poolfx=map-caustics` puts the phone back on the old mesh map, and `?poolfx=analytic-caustics` puts a desktop on the phone path. If `map-caustics` flickers and the normal address does not, the mesh map is confirmed as the cause: please report that result, so [INCIDENTS.md](INCIDENTS.md) can be updated.
 
 Switches combine: `?poolfx=no-caustics,no-glitter`. If the flash survives all of them, the fault is outside these effects, so record a screen video and report it.
 

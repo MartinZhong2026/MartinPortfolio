@@ -4,7 +4,7 @@ Read [AGENTS.md](AGENTS.md) first: it holds the project rules, commands, design 
 
 ## Workflow
 
-1. **Inspect.** Read the code you will touch before planning. `main.css` is a long cascade, so search for the selector and check whether a later block overrides it. For pool work, read `shaders.ts`, `PoolEngine.ts` and `objects.ts` together.
+1. **Inspect.** Check [docs/INCIDENTS.md](docs/INCIDENTS.md) for the area first. Read the code you will touch before planning. `main.css` is a long cascade, so search for the selector and check whether a later block overrides it. For pool work, read `shaders.ts`, `PoolEngine.ts` and `objects.ts` together.
 2. **Plan.** For anything visual, say what should change on screen before changing code. Check `docs/design-reference.png` and `docs/v6-4-target-mockup.jpg` for art direction. They are targets, not screenshots of this code.
 3. **Implement.** Keep the diff focused. Content goes in `src/data/`. Prefer tuning existing systems to adding passes or dependencies.
 4. **Test.** `npm test`, then `npm run test:e2e`. Tests that assert behaviour you changed on purpose should be updated, not weakened.
@@ -14,7 +14,7 @@ Read [AGENTS.md](AGENTS.md) first: it holds the project rules, commands, design 
 
 - Judge the pool at a few moments, not one frame, and after moving the pointer. Caustics vary over time and pointer ripples sharpen them, so a pool can pass idle and turn neon when stirred.
 - A new visual test must fail on a known-bad build. Run it against the old code before trusting it.
-- Emulation does not prove a mobile GPU fix. Say so, and point to `docs/MOBILE_TESTING.md`. `?poolfx=` switches isolate an effect on a real phone.
+- Emulation does not prove a mobile GPU fix: one such fix passed every emulated test and failed on the phone. Say so, and point to `docs/MOBILE_TESTING.md`. For a regression, diff against the last good commit before anything else.
 - Crop close-ups of floats at 2× before calling modelling or water contact finished.
 - Compare performance by alternating runs of both builds. Single SwiftShader runs vary by more than most real changes.
 - `?pool=static` shows the fallback. Check it when changing floats, labels or the pool layout.

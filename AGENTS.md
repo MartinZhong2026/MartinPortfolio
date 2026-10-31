@@ -31,6 +31,7 @@ Do not add dependencies without a clear reason. Fonts are self-hosted files, not
 | `src/pool/` | The WebGL pool |
 | `src/styles/main.css` | All styles. Later blocks override earlier ones; V10 is at the end |
 | `scripts/` | Build, dev server and test scripts |
+| `docs/INCIDENTS.md` | Known failures and what not to repeat |
 | `public/` | Files copied as they are: images, fonts, licences |
 | `docs/` | Architecture notes, design references, screenshots |
 
@@ -95,8 +96,12 @@ Read the Pool section of [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) before cha
 - **Water and deck bypass tone mapping.** Their colours are display values, hand-graded in `shaders.ts`. Three.js materials are tone mapped (Neutral), so tune the two separately.
 - **Keep `ids` and DOM links in step.** Each `poolItems` entry needs a builder in `objects.ts` and a slot in both layouts in `layout.ts`. `toyBuilders` and `toySlots` must stay the same length.
 - **Mobile budget.** Touch devices get smaller targets and a pixel ratio cap of 1.5. Avoid new full-screen passes, and test any change at 390×844.
-- **Never refresh the caustics less than once a frame.** Skipping frames makes the focus lines jump, which reads as bright flashes on phones. See "Caustics and flicker" in the architecture notes. Run `node scripts/flicker.mjs --only base --fps 30` after changing waves, `focusGain` or the caustic pipeline.
+- **Phones never use the mesh caustic map.** It caused bright flashes that only appear on real devices. Touch devices use the analytic path; `npm run test:mobile` fails if that changes. Read [docs/INCIDENTS.md](docs/INCIDENTS.md) first. On desktop, never refresh the map less than once a frame.
 - **Portrait is a fixed composition.** Labels are pinned and floats stay in cells. Run `npm run test:mobile` after moving anything in `portraitLayout` or `toySlots`.
+
+## Incidents
+
+[docs/INCIDENTS.md](docs/INCIDENTS.md) records significant bugs, regressions and failed fixes. Read the entries for anything you touch, follow its convention to add new ones, and label claims as confirmed, hypothesis or unresolved. Only a real-device test closes a real-device entry.
 
 ## Do not regress
 
