@@ -67,14 +67,15 @@ Keep the V6 identity: warm paper, deep ink, editorial spacing, aqua accents. Tok
 | Role | Font | Token | Use |
 | --- | --- | --- | --- |
 | Display | Piedra | `--font-display` | The name, `h1`, `h2`, card titles. 24px or larger. One weight, no italic |
-| Editorial | Cherry Cream Soda | `--font-editorial` | One short statement at a time; nav, buttons, pool labels |
+| Reading | Special Elite | `--font-body` | All long-form body text: paragraphs, summaries, quotations |
+| Editorial | Cherry Cream Soda | `--font-editorial` | One short statement at a time; nav, buttons, pool labels, printed float names |
 | Label | Geo | `--font-label` | "welcome to my world", eyebrows, hints, in sentence case |
-| Reading | Source Serif 4 | `--font-body` | Paragraphs, `h3`, `h4`, quotations |
-| Data | JetBrains Mono | `--font-mono` | Dates, ranks, counts, chips, simulated UI |
+| Small headings | Source Serif 4 | `--font-serif` | `h3`, `h4`, bold names, mock UI, pool tooltips |
+| Data | JetBrains Mono | `--font-mono` | Dates, ranks, counts, chips, simulated data |
 
 Two rules exist because of real legibility failures. Do not put names people navigate by in Geo: its capital A reads as an R ("Rbout"). Do not put numbers in Geo: its numerals are old-style, so "5" reads as "s".
 
-`font-synthesis` is off, so a font without a bold or italic will not fake one. Every font and its licence is in `public/fonts/`.
+Special Elite has one weight, a wide set and a strong texture. Keep it at 13px or larger, give it generous leading, and leave `word-spacing` on `body` alone: the V11 block in `main.css` is tuned as a set. `font-synthesis` is off globally, then allowed for `strong` and `em`, so inline emphasis still shows in Special Elite. Every font and its licence is in `public/fonts/`.
 
 Responsive rules: design from 320px up; `max-aspect-ratio: 5/6` switches the pool to portrait; Home must fit one screen with no scrolling at common sizes.
 
@@ -83,17 +84,19 @@ Responsive rules: design from 320px up; `max-aspect-ratio: 5/6` switches the poo
 Read the Pool section of [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) before changing anything in `src/pool/`. Constraints that are easy to break:
 
 - **The water mesh is opaque.** Anything below y = 0 is hidden and is drawn by the water shader from the footprint map. A float that rocks too far dips through the surface, which is why every object declares `maxTilt`.
+- **The look is soft on purpose.** Caustics stay broad and white, never a bright cyan web. Long waves shape them; fine detail comes from `rippleTex`, which never reaches the caustics. Before raising `focusGain`, wave slopes or pointer drop strength, check a stirred pool, not just an idle one. `test:e2e` fails if the water's brightness spread reaches 52.
+- **Ducks are decoration.** They have no link, hit target or label, and they wander. Keep their slots in `duckSlots` clear of the name on the floor.
 - **Water shaders never loop over objects.** Per-object data reaches the water through `FloatShadows` textures, so adding a float adds no per-pixel cost.
 - **`WAVES` is shared.** GPU refraction, caustics and CPU buoyancy all read it. Change amplitudes in one place and retune `focusGain`.
 - **Water and deck bypass tone mapping.** Their colours are display values, hand-graded in `shaders.ts`. Three.js materials are tone mapped (Neutral), so tune the two separately.
-- **Keep `ids` and DOM links in step.** Each `poolItems` entry needs a builder in `objects.ts` and a slot in both layouts in `layout.ts`.
+- **Keep `ids` and DOM links in step.** Each `poolItems` entry needs a builder in `objects.ts` and a slot in both layouts in `layout.ts`. `duckBuilders` and `duckSlots` must stay the same length.
 - **Mobile budget.** Touch devices get smaller targets, a pixel ratio cap of 1.5 and caustics on alternate frames. Avoid new full-screen passes, and test any change at 390×844.
 
 ## Do not regress
 
 - All routes: `/`, `/about/`, `/work/`, `/life/`, the five `/work/<slug>/` pages, 404, and the `/contact` redirect.
 - Exactly five projects, flagship first. Do not add a sixth.
-- "Martin Zhong" centred on the pool floor with "welcome to my world" beneath, refracted but readable.
+- "Martin Zhong" centred on the pool floor with "welcome to my world" beneath, refracted but readable, with no float or duck resting on it.
 - Project branding and clickable floats, plus a matching real link for every float.
 - The no-JavaScript and no-WebGL pool, `prefers-reduced-motion`, keyboard focus and skip link.
 - Published content rules enforced by `scripts/check-content.mjs`: only the confirmed email, only consented testimonials verbatim, no excluded experience, every image with `alt` and dimensions, one status/limits section per case.
@@ -109,5 +112,5 @@ A passing build proves nothing about rendering. For any visual change, run `npm 
 - Run `npm test` and `npm run test:e2e` before pushing, and batch work into one push per milestone.
 - PRs describe the change, the test results and anything unverified, with screenshots for visual work.
 - Never merge or deploy to production without Martin's approval.
-- `dist/` and `node_modules/` are tracked for historical reasons, but `dist/` has not been maintained since the first commit. Do not commit rebuilt `dist/` output: restore it first with `git restore dist && git clean -fdq dist`.
+- `dist/` and `node_modules/` are tracked for historical reasons. `npm run build` is the only source of `dist/`. If you commit it, rebuild from the final code first, in its own commit, so the tracked copy never holds a half-finished build.
 - Never commit secrets or tokens.

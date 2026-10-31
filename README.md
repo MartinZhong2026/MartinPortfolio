@@ -1,6 +1,6 @@
 # Martin Zhong — Pool Portfolio
 
-Martin Zhong's personal portfolio. The homepage is an interactive WebGL swimming pool: brand kickboards pushed by rubber ducks lead to five case studies, a paper boat leads to About, and a swim ring leads to Life.
+Martin Zhong's personal portfolio. The homepage is an interactive WebGL swimming pool: branded cushions lead to five case studies, a paper boat leads to About, a swim ring leads to Life, and a few rubber ducks drift around for company.
 
 Built with React (static rendering), TypeScript, esbuild and Three.js. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for how it works and [AGENTS.md](AGENTS.md) for contribution rules.
 
@@ -56,7 +56,7 @@ docs/           Architecture notes, design references, screenshots
 - `src/data/projects.ts`: the five projects and their card text.
 - `src/data/testimonials.ts`: the two authorised excerpts. `consent: false` stops one rendering.
 - `src/data/artifacts.ts`: optional medical booklet originals.
-- `src/pool/layout.ts`: where each float sits, in landscape and portrait.
+- `src/pool/layout.ts`: where each float and duck sits, in landscape and portrait.
 
 ## Deployment
 
@@ -68,7 +68,7 @@ The site is designed for Cloudflare Pages:
 
 The build generates the `_headers` (security policy, caching) and `_redirects` files Cloudflare reads. The repository contains no Cloudflare configuration, so confirm these settings in the Cloudflare dashboard. Deploy only with Martin's approval.
 
-`dist/` is tracked in git but out of date: it has not been updated since the first commit. Treat `npm run build` as the only source of `dist/`.
+`dist/` is tracked in git for historical reasons, so it can fall behind the source. Treat `npm run build` as the only source of `dist/`.
 
 ## Before launch
 

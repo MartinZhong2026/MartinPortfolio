@@ -12,7 +12,8 @@ Read [AGENTS.md](AGENTS.md) first: it holds the project rules, commands, design 
 
 ## Visual verification
 
-- Judge the pool at a few moments, not one frame. Caustics vary over time, so the name can read well in one capture and poorly in the next.
+- Judge the pool at a few moments, not one frame, and after moving the pointer. Caustics vary over time and pointer ripples sharpen them, so a pool can pass idle and turn neon when stirred.
+- A new visual test must fail on a known-bad build. Run it against the old code before trusting it.
 - Crop close-ups of floats at 2× before calling modelling or water contact finished.
 - Compare performance by alternating runs of both builds. Single SwiftShader runs vary by more than most real changes.
 - `?pool=static` shows the fallback. Check it when changing floats, labels or the pool layout.

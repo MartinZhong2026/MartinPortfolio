@@ -27,7 +27,7 @@ Updated 27 October 2026. The approved V6 design and routes remain the baseline.
 
 ## Optional float assets
 
-V10 note: pool floats use the brand icons in `public/assets/icons/` on modelled kickboards with procedural rubber ducks. Older float textures in `public/assets/floats/` are no longer used at runtime. Adapt to China and FanScope cases now include dated user-supplied screenshots. Document AI uses a clearly identified **reference-inspired temporary icon**, not a supplied formal brand mark. Replace it when an official mark is available. Do not regenerate unused V6.3 SDF images.
+V11 note: pool floats use the brand icons in `public/assets/icons/`, printed on modelled cushions. Rubber ducks are procedural and decorative. Older float textures in `public/assets/floats/` are no longer used at runtime. Adapt to China and FanScope cases now include dated user-supplied screenshots. Document AI uses a clearly identified **reference-inspired temporary icon**, not a supplied formal brand mark. Replace it when an official mark is available. Do not regenerate unused V6.3 SDF images.
 
 ## V8
 - FanScope mobile trend screenshot shows sample counts and missingness; replace it if these figures should stay internal.
