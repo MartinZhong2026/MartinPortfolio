@@ -31,10 +31,13 @@ export interface CollageItem {
   alt: string;
   caption: string;
   href?: string;
+  /** rise into the empty space beside the picture above, instead of below it */
+  tuck?: boolean;
 }
 export const storyCollage: CollageItem[] = [
   { kind: 'browser', src: '/assets/adapt/live-homepage.jpg', width: 1700, height: 932, alt: 'Adapt to China homepage: “What do you need to figure out today?” with a search box and quick topics.', caption: 'Adapt to China · the live site', href: '/work/adapt-to-china/' },
   { kind: 'phone', src: '/assets/adapt/atc-ai-chat-20261027.webp', width: 900, height: 1671, alt: 'ATC AI on mobile: General and House Planner (Testing) modes, asking “What do you need help with in China?”', caption: 'The ATC AI assistant', href: '/work/adapt-to-china/' },
+  { kind: 'browser', tuck: true, src: '/assets/fanscope/research-trends-20261027.webp', width: 1660, height: 923, alt: 'FanScope desktop research-trends dashboard with papers by month, topics and research methods.', caption: 'FanScope', href: '/work/fanscope/' },
   { kind: 'photo', src: '/assets/about/hong-kong-sketch.jpg', width: 1536, height: 957, alt: 'Martin’s original ink sketch of the Hong Kong skyline at Victoria Peak in June 2024.', caption: 'My sketch · Victoria Peak', href: '/life/#gallery' },
   { kind: 'logo', src: '/assets/icons/adapt-to-china.png', width: 512, height: 512, alt: 'Adapt to China logo: the Oriental Pearl Tower and Shanghai skyline above the words Live, Learn, Belong.', caption: 'Live · Learn · Belong', href: '/work/adapt-to-china/' },
 ];

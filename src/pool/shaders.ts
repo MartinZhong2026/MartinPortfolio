@@ -264,8 +264,9 @@ vec3 floorTiles(vec2 p) {
   // rotates the print to follow the camera, while retaining refraction.
   vec2 oriented = portraitMode > 0.5
     // portrait: screen-right = world -z, screen-up = world -x; the canvas keeps
-    // its 1536×960 aspect, spread across 2.2 × 1.375 world units.
-    ? vec2(-p.y / 1.1, -p.x / 0.6875)
+    // its 1536×960 aspect, spread across 2.2 × 1.375 world units. The name rides
+    // a little high, so name and call to action centre as one group.
+    ? vec2(-p.y / 1.1, -(p.x + 0.17) / 0.6875)
     : vec2(p.x / halfSize.x, -p.y / halfSize.y);
   vec4 ink = texture2D(floorTypeTex, oriented * 0.5 + 0.5);
   // Printed before the grout so the lettering reads as inlaid mosaic.

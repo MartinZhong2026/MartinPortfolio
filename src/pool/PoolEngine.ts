@@ -17,8 +17,8 @@ import {
   waterVert,
 } from './shaders';
 import { FloatShadows } from './FloatShadows';
-import { builders, duckBuilders, disposeObjectResources, type BuiltObject } from './objects';
-import { duckSlots, landscapeLayout, POOL, portraitLayout, type PoolObjectId, type Slot } from './layout';
+import { builders, toyBuilders, disposeObjectResources, type BuiltObject } from './objects';
+import { toySlots, landscapeLayout, POOL, portraitLayout, type PoolObjectId, type Slot } from './layout';
 
 export interface Anchor {
   x: number;
@@ -32,7 +32,7 @@ export interface EngineOptions {
   ids: PoolObjectId[];
   onHover(id: PoolObjectId | null): void;
   onActivate(id: PoolObjectId): void;
-  onFrame(anchors: Map<PoolObjectId, Anchor>, portrait: boolean): void;
+  onFrame(anchors: Map<PoolObjectId, Anchor>, portrait: boolean, cta: { x: number; y: number }): void;
   onFirstFrame(): void;
   onContextLost(): void;
 }
@@ -65,6 +65,10 @@ interface ObjState {
 const SUN_LANDSCAPE: [number, number, number] = [-0.4, 1.0, -0.22];
 const SUN_PORTRAIT: [number, number, number] = [-0.22, 1.0, 0.4];
 
+/** Where the call to action floats, just past "welcome to my world" on screen. */
+const CTA_LANDSCAPE = { x: 0, z: 0.6, halfX: 0.42, halfZ: 0.1 };
+const CTA_PORTRAIT = { x: 0.37, z: 0, halfX: 0.09, halfZ: 0.42 };
+
 /** Camera tilt from straight down, in radians: enough to see the far wall. */
 const TILT_LANDSCAPE = 0.54;
 const TILT_PORTRAIT = 0.36;
@@ -73,7 +77,7 @@ const { halfX: W, halfZ: L, depth: D, rimH: RIM, coping: COPING } = POOL;
 
 /**
  * Real-time pool: heightfield water simulation on the GPU, caustics, a
- * ray-traced tiled interior, a tiled deck, seven linked floats and a few ducks.
+ * ray-traced tiled interior, a tiled deck, seven linked floats and a few small toys.
  * All state lives here; React only mounts it and draws DOM labels.
  */
 export class PoolEngine {
@@ -397,7 +401,7 @@ export class PoolEngine {
       });
     };
     opts.ids.forEach((id) => addFloat(id, builders[id](), { landscape: landscapeLayout[id], portrait: portraitLayout[id] }));
-    duckBuilders.forEach((build, i) => addFloat(null, build(), duckSlots[i]));
+    toyBuilders.forEach((build, i) => addFloat(null, build(), toySlots[i]));
 
     this.floatShadows = new FloatShadows(this.renderer, this.objects.map(o => o.built.group), this.shared.halfSize.value, D, light, opts.coarse);
     this.shared.shadowTex.value = this.floatShadows.target.texture;
@@ -802,7 +806,7 @@ export class PoolEngine {
     const active = this.hoverId ?? this.focusId;
     for (const o of this.objects) {
       // Light buoyancy: keep drifting for a moment, then return slowly toward
-      // each float's starting area rather than snapping into place. Ducks pull
+      // each float's starting area rather than snapping into place. Toys pull
       // less, and paddle around a slowly wandering home of their own.
       const decor = !o.id;
       const k = rm ? 4.0 : decor ? 0.5 : 1.15;
@@ -814,7 +818,7 @@ export class PoolEngine {
       o.vel.clampLength(0, 0.85);
       const speed = o.vel.length();
       o.pos.addScaledVector(o.vel, dt);
-      // Ducks turn to face where they are going.
+      // Toys turn to face where they are going.
       if (decor && speed > 0.008) {
         const turn = Math.atan2(o.vel.x, o.vel.y) - o.yaw;
         o.yaw += Math.atan2(Math.sin(turn), Math.cos(turn)) * (1 - Math.exp(-dt * 1.2));
@@ -895,6 +899,21 @@ export class PoolEngine {
     }
     for (const o of this.objects) {
       const radius = o.built.radius * o.scale;
+      // Nothing drifts under the call to action: slide out along screen-vertical.
+      const keep = this.portrait ? CTA_PORTRAIT : CTA_LANDSCAPE;
+      const reachX = keep.halfX + radius;
+      const reachZ = keep.halfZ + radius;
+      const offX = o.pos.x - keep.x;
+      const offZ = o.pos.y - keep.z;
+      if (Math.abs(offX) < reachX && Math.abs(offZ) < reachZ) {
+        if (this.portrait) {
+          o.pos.x = keep.x + (offX < 0 ? -reachX : reachX);
+          o.vel.x *= -0.3;
+        } else {
+          o.pos.y = keep.z + (offZ < 0 ? -reachZ : reachZ);
+          o.vel.y *= -0.3;
+        }
+      }
       const edgeX = W - radius - 0.035;
       const edgeZ = L - radius - 0.035;
       if (Math.abs(o.pos.x) > edgeX) {
@@ -927,7 +946,9 @@ export class PoolEngine {
       const ey = (-edge.y * 0.5 + 0.5) * this.ch;
       this.anchors.set(o.id, { x, y, r: Math.hypot(ex - x, ey - y) });
     }
-    this.opts.onFrame(this.anchors, this.portrait);
+    const keep = this.portrait ? CTA_PORTRAIT : CTA_LANDSCAPE;
+    const spot = this.tmpV3.set(keep.x, 0, keep.z).project(this.camera);
+    this.opts.onFrame(this.anchors, this.portrait, { x: (spot.x * 0.5 + 0.5) * this.cw, y: (-spot.y * 0.5 + 0.5) * this.ch });
   }
 
   /** Step down one rung at a time while the frame rate stays under 40 fps. */

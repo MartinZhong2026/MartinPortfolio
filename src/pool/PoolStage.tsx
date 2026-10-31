@@ -40,6 +40,7 @@ export function PoolStage() {
   const [active, setActive] = useState<PoolObjectId | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const frameRef = useRef<HTMLDivElement>(null);
+  const ctaRef = useRef<HTMLDivElement>(null);
   const wipeRef = useRef<HTMLDivElement>(null);
   const linkRefs = useRef(new Map<PoolObjectId, HTMLAnchorElement>());
   const engineRef = useRef<PoolEngine | null>(null);
@@ -79,11 +80,12 @@ export function PoolStage() {
             setMode('unsupported');
             document.documentElement.dataset.pool = 'unsupported';
           },
-          onFrame: (anchors) => {
+          onFrame: (anchors, _portrait, cta) => {
             const fr = frame.getBoundingClientRect();
             const cr = canvasRef.current!.getBoundingClientRect();
             const ox = fr.left - cr.left;
             const oy = fr.top - cr.top;
+            if (ctaRef.current) ctaRef.current.style.transform = `translate3d(${(cta.x - ox).toFixed(1)}px, ${(cta.y - oy).toFixed(1)}px, 0)`;
             const placed: LabelBox[] = [];
             // Keep labels off the floats and off the name on the pool floor.
             const avoided: LabelBox[] = [...anchors.values()].map((a) => {
@@ -93,6 +95,11 @@ export function PoolStage() {
             const nameW = fr.width * (fr.height > fr.width ? 0.76 : 0.56);
             const nameH = fr.height * (fr.height > fr.width ? 0.17 : 0.3);
             avoided.push({ x: (fr.width - nameW) / 2, y: (fr.height - nameH) / 2, w: nameW, h: nameH });
+            const button = ctaRef.current?.firstElementChild as HTMLElement | undefined;
+            if (button) {
+              const w = button.offsetWidth, h = button.offsetHeight;
+              avoided.push({ x: cta.x - ox - w / 2, y: cta.y - oy - h / 2, w, h });
+            }
             // Batch layout reads before per-label style writes.
             const dimensions = new Map([...linkRefs.current].map(([id, el]) => {
               const label = el.querySelector<HTMLElement>('.pool-obj__label');
@@ -201,6 +208,11 @@ export function PoolStage() {
             </div>
           </div>
           <h1 className="sr-only">Martin Zhong — welcome to my world</h1>
+          <div className="pool__cta-anchor" ref={ctaRef}>
+            <a className="pool__cta" href="/work/">
+              Dive into my world <span aria-hidden="true">→</span>
+            </a>
+          </div>
           <ul className="pool__objects" aria-label="Projects and pages floating in the pool">
             {poolItems.map((item) => {
               const l = landscapeLayout[item.id];
@@ -244,9 +256,6 @@ export function PoolStage() {
             <span className="hint-fine">Click a floating object to explore.</span>
             <span className="hint-coarse">Tap a floating object to explore.</span>
           </p>
-          <a className="pool__cta" href="/work/">
-            Dive into my world <span aria-hidden="true">→</span>
-          </a>
           <p className="pool__status" role="status" aria-live="polite">
             {mode === 'loading' && 'Getting the pool ready…'}
             {mode === 'unsupported' &&

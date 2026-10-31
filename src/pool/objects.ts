@@ -4,7 +4,7 @@ import type { PoolObjectId } from './layout';
 
 /**
  * Everything floating in the pool. Projects are thick branded cushions, a paper
- * boat sails to About, a swim ring to Life, and a few rubber ducks drift around
+ * boat sails to About, a swim ring to Life, and a few small toys drift around
  * for company. Every builder returns a group whose top faces +y, whose
  * "screen-up" points -z and whose waterline sits at y = 0. Anything below y = 0
  * is hidden by the opaque water mesh and drawn by the water shader from the
@@ -317,7 +317,7 @@ function swimRing(): BuiltObject {
 /* ------------------------------------------------------------- */
 /* Rubber ducks                                                     */
 /* ------------------------------------------------------------- */
-type Accessory = 'sunglasses' | 'snorkel' | 'sunhat';
+type Accessory = 'sunglasses' | 'sunhat';
 
 const accessoryBuilders: Record<Accessory, (head: THREE.Group) => void> = {
   sunglasses(head) {
@@ -335,25 +335,6 @@ const accessoryBuilders: Record<Accessory, (head: THREE.Group) => void> = {
     const bridge = mesh(shared('shade-bridge', () => new THREE.CapsuleGeometry(0.024, 0.1, 4, 8)), frame, 0, 0.2, 0.53);
     bridge.rotation.z = Math.PI / 2;
     head.add(bridge);
-  },
-  snorkel(head) {
-    const mask = vinyl('#1f9a96', 0.3);
-    const visor = mesh(shared('mask-visor', () => new THREE.SphereGeometry(0.34, 20, 14)), vinyl('#a9e9f2', 0.06, { clearcoat: 1 }), 0, 0.17, 0.36);
-    visor.scale.set(1.15, 0.62, 0.62);
-    const skirt = mesh(shared('mask-skirt', () => new THREE.SphereGeometry(0.39, 20, 14)), mask, 0, 0.16, 0.32);
-    skirt.scale.set(1.16, 0.68, 0.56);
-    const strap = mesh(shared('mask-strap', () => new THREE.TorusGeometry(0.53, 0.035, 8, 40)), mask, 0, 0.1, 0);
-    strap.rotation.x = Math.PI / 2 - 0.1;
-    const tube = mesh(
-      shared('snorkel-tube', () =>
-        new THREE.TubeGeometry(
-          new THREE.CatmullRomCurve3([new THREE.Vector3(0.5, -0.12, 0.28), new THREE.Vector3(0.66, 0.1, 0.12), new THREE.Vector3(0.68, 0.48, -0.08), new THREE.Vector3(0.66, 0.82, -0.14)]),
-          22, 0.05, 8,
-        ),
-      ),
-      vinyl('#ff8a4c', 0.3),
-    );
-    head.add(skirt, visor, strap, tube);
   },
   sunhat(head) {
     const straw = matte('#f0d9a6', 0.72);
@@ -452,6 +433,116 @@ function rubberDuck(accessory?: Accessory): BuiltObject {
   };
 }
 
+/* ------------------------------------------------------------- */
+/* Small decorative toys                                            */
+/* ------------------------------------------------------------- */
+function beachBall(): BuiltObject {
+  const { canvas, texture, c } = canvasTexture(1024, 512);
+  if (c) {
+    const colours = ['#ffffff', '#f2553d', '#ffffff', '#ffc62e', '#ffffff', '#27a7d8'];
+    colours.forEach((colour, i) => {
+      c.fillStyle = colour;
+      c.fillRect((i * canvas.width) / 6, 0, canvas.width / 6 + 1, canvas.height);
+    });
+    c.fillStyle = '#ffffff';
+    c.fillRect(0, 0, canvas.width, 34);
+    c.fillRect(0, canvas.height - 34, canvas.width, 34);
+  }
+  const R = 0.074;
+  const ball = mesh(track(new THREE.SphereGeometry(R, 36, 24)), vinyl('#ffffff', 0.24, { map: texture, clearcoat: 1, clearcoatRoughness: 0.12 }), 0, R * 0.62, 0);
+  ball.rotation.set(0.7, 0.4, 0.5);
+  const group = new THREE.Group();
+  group.add(ball);
+  return {
+    group,
+    radius: R,
+    top: R * 1.6,
+    mass: 0.6,
+    maxTilt: 0.2,
+    animate(time) {
+      ball.rotation.y = 0.4 + time * 0.16;
+    },
+  };
+}
+
+/** A mini iced-doughnut ring, sprinkles and all. */
+function doughnutRing(): BuiltObject {
+  const { canvas, texture, c } = canvasTexture(1024, 256);
+  if (c) {
+    c.fillStyle = '#ffa9c6';
+    c.fillRect(0, 0, canvas.width, canvas.height);
+    const sprinkles = ['#ffffff', '#ffd84d', '#27a7d8', '#7ed6a5'];
+    let seed = 11;
+    const random = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    c.lineWidth = 9;
+    c.lineCap = 'round';
+    for (let i = 0; i < 90; i++) {
+      const x = random() * canvas.width;
+      const y = random() * canvas.height;
+      const a = random() * Math.PI;
+      c.strokeStyle = sprinkles[i % sprinkles.length];
+      c.beginPath();
+      c.moveTo(x, y);
+      c.lineTo(x + Math.cos(a) * 20, y + Math.sin(a) * 20);
+      c.stroke();
+    }
+  }
+  const R = 0.07;
+  const r = 0.034;
+  const ring = mesh(track(new THREE.TorusGeometry(R, r, 20, 56)), vinyl('#ffffff', 0.26, { map: texture, clearcoat: 0.9, clearcoatRoughness: 0.16 }), 0, 0.012, 0);
+  ring.rotation.x = Math.PI / 2;
+  const group = new THREE.Group();
+  group.add(ring);
+  return { group, radius: R + r, top: 0.05, mass: 0.7, maxTilt: 0.2 };
+}
+
+/** A little bath turtle, paddling. Faces +z like the ducks. */
+function toyTurtle(): BuiltObject {
+  const skin = vinyl('#7ed6a5', 0.34);
+  const shell = mesh(
+    shared('turtle-shell', () =>
+      sculptedSphere([32, 20], (v) => {
+        v.y = Math.max(v.y, -0.2) * 0.62;
+      }),
+    ),
+    vinyl('#2f9e6e', 0.26, { clearcoat: 0.9 }),
+    0, 0.012, 0,
+  );
+  shell.scale.setScalar(0.062);
+  const spots = matte('#ffd84d', 0.4);
+  const spot = shared('turtle-spot', () => new THREE.SphereGeometry(0.0115, 12, 8));
+  const group = new THREE.Group();
+  for (const [x, z] of [[0, 0], [0.028, 0.02], [-0.028, 0.02], [0.03, -0.024], [-0.03, -0.024]]) {
+    const y = 0.012 + 0.0385 * Math.sqrt(Math.max(0, 1 - (x * x + z * z) / 0.0038));
+    group.add(mesh(spot, spots, x, y, z));
+  }
+  const head = mesh(shared('turtle-head', () => new THREE.SphereGeometry(0.026, 16, 12)), skin, 0, 0.026, 0.068);
+  const eye = matte('#101418', 0.14);
+  for (const side of [1, -1]) group.add(mesh(shared('turtle-eye', () => new THREE.SphereGeometry(0.0052, 8, 6)), eye, side * 0.014, 0.04, 0.083));
+  const flipper = shared('turtle-flipper', () => {
+    const g = new THREE.SphereGeometry(1, 14, 10);
+    g.scale(0.03, 0.009, 0.017);
+    return g;
+  });
+  const flippers = [[0.058, 0.03, 0.5], [-0.058, 0.03, -0.5], [0.05, -0.04, -0.6], [-0.05, -0.04, 0.6]].map(([x, z, yaw]) => {
+    const f = mesh(flipper, skin, x, 0.012, z);
+    f.rotation.y = yaw;
+    group.add(f);
+    return f;
+  });
+  group.add(shell, head);
+  return {
+    group,
+    radius: 0.078,
+    top: 0.06,
+    mass: 0.6,
+    maxTilt: 0.2,
+    animate(time) {
+      flippers.forEach((f, i) => (f.rotation.y = [0.5, -0.5, -0.6, 0.6][i] + Math.sin(time * 1.6 + i * 1.5) * 0.22));
+    },
+  };
+}
+
 export const builders: Record<PoolObjectId, () => BuiltObject> = {
   'adapt-to-china': () => brandFloat('adapt-to-china'),
   meetfolio: () => brandFloat('meetfolio'),
@@ -462,5 +553,5 @@ export const builders: Record<PoolObjectId, () => BuiltObject> = {
   life: swimRing,
 };
 
-/** One per entry in `duckSlots`. */
-export const duckBuilders: (() => BuiltObject)[] = [() => rubberDuck(), () => rubberDuck('sunglasses'), () => rubberDuck('sunhat'), () => rubberDuck('snorkel')];
+/** One per entry in `toySlots`. */
+export const toyBuilders: (() => BuiltObject)[] = [beachBall, () => rubberDuck('sunglasses'), () => rubberDuck('sunhat'), doughnutRing, toyTurtle];

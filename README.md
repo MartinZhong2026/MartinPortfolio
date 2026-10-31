@@ -1,6 +1,6 @@
 # Martin Zhong — Pool Portfolio
 
-Martin Zhong's personal portfolio. The homepage is an interactive WebGL swimming pool: branded cushions lead to five case studies, a paper boat leads to About, a swim ring leads to Life, and a few rubber ducks drift around for company.
+Martin Zhong's personal portfolio. The homepage is an interactive WebGL swimming pool: branded cushions lead to five case studies, a paper boat leads to About, a swim ring leads to Life, and a few small toys drift around for company.
 
 Built with React (static rendering), TypeScript, esbuild and Three.js. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for how it works and [AGENTS.md](AGENTS.md) for contribution rules.
 
@@ -57,7 +57,7 @@ docs/           Architecture notes, design references, screenshots
 - `src/data/projects.ts`: the five projects and their card text.
 - `src/data/testimonials.ts`: the two authorised excerpts. `consent: false` stops one rendering.
 - `src/data/artifacts.ts`: optional medical booklet originals.
-- `src/pool/layout.ts`: where each float and duck sits, in landscape and portrait.
+- `src/pool/layout.ts`: where each float and toy sits, in landscape and portrait.
 
 ## Deployment
 

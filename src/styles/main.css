@@ -27,6 +27,12 @@
   font-display: swap;
 }
 @font-face {
+  font-family: 'Boogaloo';
+  src: url('/fonts/boogaloo.woff2') format('woff2');
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
   font-family: 'Special Elite';
   src: url('/fonts/special-elite.woff2') format('woff2');
   font-weight: 400;
@@ -80,6 +86,7 @@
   --font-editorial: 'Cherry Cream Soda', 'Source Serif 4', Georgia, 'Times New Roman', serif;
   --font-label: 'Geo', 'JetBrains Mono', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
   --font-body: 'Special Elite', 'Courier New', Courier, monospace;
+  --font-story: 'Boogaloo', 'Special Elite', 'Courier New', monospace;
   --font-serif: 'Source Serif 4', Georgia, 'Times New Roman', serif;
   --font-mono: 'JetBrains Mono', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
 
@@ -3239,7 +3246,7 @@ h3, h4 { font-family: var(--font-serif); font-weight: 700; letter-spacing: -0.00
 .page-home .site-header { pointer-events: none; }
 .page-home .site-header a { pointer-events: auto; }
 .pool {
-  --fw-l: min(calc(100vw - 48px), calc((100svh - 34px - 78px) * 1.8), 1560px);
+  --fw-l: min(calc(100vw - 48px), calc((100svh - 34px - 52px) * 1.8), 1560px);
   --fw: max(var(--fw-l), 480px);
   --fh: calc(var(--fw) / 1.8);
   min-height: max(100svh, calc(var(--fh) + 96px));
@@ -3548,3 +3555,72 @@ a.sc-link:focus-visible { outline: 3px solid var(--aqua); outline-offset: 4px; }
   .sc figcaption { font-size: 12px; }
   .story-question { max-width: none; }
 }
+
+/* ========================================================================
+   V13 — the call to action floats on the water; About hero and story details
+   ======================================================================== */
+.pool__bar { display: flex; justify-content: space-between; }
+.pool__status { flex: 1; max-width: none; text-align: left; justify-self: start; }
+.pool__cta-anchor { position: absolute; left: 50%; top: 74%; z-index: 3; width: 0; height: 0; }
+.pool--live .pool__cta-anchor { left: 0; top: 0; will-change: transform; }
+.pool__cta {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform: translate(-50%, -50%);
+  background: var(--sun);
+  color: var(--ink);
+  font-size: 17px;
+  padding: 10px 24px;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.85), 0 3px 0 3px rgba(190, 140, 20, 0.55), 0 14px 18px -6px rgba(4, 60, 100, 0.55);
+  animation: cta-bob 4.2s ease-in-out infinite;
+}
+.pool__cta span { color: var(--ink); }
+.pool__cta:hover { transform: translate(-50%, calc(-50% - 2px)); background: #ffe27a; }
+.pool__cta:focus-visible { outline-color: var(--ink); }
+/* A slow ring spreading from the float, like everything else on the water. */
+.pool__cta::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: 999px;
+  border: 2px solid rgba(255, 255, 255, 0.7);
+  pointer-events: none;
+  animation: cta-ring 4.2s ease-out infinite;
+}
+@keyframes cta-bob {
+  50% { transform: translate(-50%, calc(-50% - 3px)) rotate(-0.6deg); }
+}
+@keyframes cta-ring {
+  0% { transform: scale(1); opacity: 0.8; }
+  70%, 100% { transform: scale(1.16, 1.5); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pool__cta, .pool__cta::after { animation: none; }
+  .pool__cta::after { opacity: 0; }
+}
+@media (max-aspect-ratio: 5/6) {
+  .pool__cta-anchor { top: 63.5%; }
+  .pool:not(.pool--live) .pool-obj { --r: calc(var(--fw) * 0.066); }
+  .pool:not(.pool--live) .pool-obj--flagship { --r: calc(var(--fw) * 0.09); }
+  .pool .pool__cta { order: 0; font-size: 13.5px; padding: 10px 15px; gap: 6px; }
+  .pool__bar { padding-top: 12px; }
+}
+
+/* "Martin Zhong" never splits; on narrow screens "I am" takes its own line. */
+.about-v6__hero :is(h1, h2) { max-width: none; }
+.about-v6__hero :is(h1, h2) em { white-space: nowrap; }
+
+/* The story essay alone is set in Boogaloo. It is narrow and light-footed, so it
+   runs larger than Special Elite, with open letters and generous leading. */
+.about-v6__story-copy p {
+  font-family: var(--font-story);
+  font-size: clamp(19px, 1.5vw, 21px);
+  line-height: 1.58;
+  letter-spacing: 0.012em;
+  word-spacing: 0.04em;
+  margin-bottom: 1.05em;
+  color: #2f4456;
+}
+
+.sc-link--tuck { margin-top: -50%; width: 58%; z-index: 2; }

@@ -28,8 +28,8 @@ There is no client-side router: links are full page loads. Same-origin cross-fad
 
 - `src/components/Layout.tsx` renders the full document, header, footer and skip link. The primary nav comes from `nav` in `src/data/site.ts`.
 - `src/pages/pages.tsx` holds the top-level pages. About is composed of `AboutHero`, `AboutProof`, `AboutStory`, `AboutStrengths` and `AboutClosing`.
-- **About story.** `AboutStory` is a two-column spread: a collage of real images (`storyCollage` in `about.ts`) beside the essay. The essay is Martin's approved copy, kept in `scripts/fixtures/about-story.md` and turned into `src/data/story.ts` by `scripts/gen-story.mjs`, so the page cannot drift from it. The collage grows downwards: each image takes its own row, alternates left and right, and tucks under the one above, so appending an entry to `storyCollage` reflows it without CSS changes. `kind` (`browser`, `phone`, `photo`, `logo`) sets its frame and width. On phones it stacks above the essay.
-- **Home call to action.** `PoolStage` renders a "Dive into my world →" link to `/work/` in the bar under the pool, flanked by the instruction line. It sits outside the water, so it never covers the name or a float. On portrait screens the bar stacks with the button first.
+- **About story.** `AboutStory` is a two-column spread: a collage of real images (`storyCollage` in `about.ts`) beside the essay. The essay is Martin's approved copy, its paragraphs set in Boogaloo, kept in `scripts/fixtures/about-story.md` and turned into `src/data/story.ts` by `scripts/gen-story.mjs`, so the page cannot drift from it. The collage grows downwards: each image takes its own row, alternates left and right, and tucks under the one above, so appending an entry to `storyCollage` reflows it without CSS changes. `tuck` raises an image into the space beside the one above. `kind` (`browser`, `phone`, `photo`, `logo`) sets its frame and width. On phones it stacks above the essay.
+- **Home call to action.** `PoolStage` renders a "Dive into my world →" link to `/work/` as a float on the water, below the name. The engine projects a fixed water point (`CTA_LANDSCAPE`, `CTA_PORTRAIT`) to screen each frame so the link follows the camera, keeps floats out of that area, and label placement avoids it. Without WebGL it sits at a fixed position in the CSS pool. The instruction line stays in the bar under the pool.
 - `src/components/case.tsx` provides the case-study building blocks used by `src/pages/cases/`.
 - Content lives in `src/data/`: `site.ts` (links, origin, roles), `projects.ts` (the five projects), `about.ts` (strengths, Life content, photos, the About collage), `story.ts` (the About essay, generated), `testimonials.ts` (consent-gated quotes), `artifacts.ts` (optional originals).
 
@@ -85,9 +85,9 @@ Geometry above `WATERLINE_Y` is discarded from the footprint, so only what actua
 
 - Five `brandFloat`s: thick cushions shaped as a superquadric, with the brand mark and name painted to a canvas and projected onto the top. The marks come from `public/assets/icons/`.
 - `paperBoat` links to About and carries "About Martin" on its camera-side hull. `swimRing` links to Life.
-- Four decorative `rubberDuck`s from `duckBuilders`. They have no link or hit target, share their geometry, and paddle around a slowly wandering home.
+- Five decorative toys from `toyBuilders`: two `rubberDuck`s, a `beachBall`, a `doughnutRing` and a `toyTurtle`. They have no link or hit target and paddle around a slowly wandering home.
 
-`updateObjects()` applies a spring toward each home position, pointer and collision impulses, and a mass-weighted spring to the local swell. `layout.ts` is the single source of positions for both the live scene and the CSS fallback, in screen-normalised coordinates. Adjust slots there, not in the engine. `duckSlots` holds the ducks; the fallback does not show them.
+`updateObjects()` applies a spring toward each home position, pointer and collision impulses, and a mass-weighted spring to the local swell. `layout.ts` is the single source of positions for both the live scene and the CSS fallback, in screen-normalised coordinates. Adjust slots there, not in the engine. `toySlots` holds the toys; the fallback does not show them.
 
 ### Lighting
 

@@ -78,7 +78,16 @@ try {
     assert((await page.locator('.pool__cta').textContent()).includes('Dive into my world'));
     assert(cta.y+cta.height<=viewport.height,`CTA is below the first screen at ${viewport.width}px`);
     assert(cta.height>=40&&cta.x>=0&&cta.x+cta.width<=viewport.width,`CTA size or position is off at ${viewport.width}px`);
-    assert(cta.y>=frame.y+frame.height-2,'CTA must not cover the pool');
+    // It floats on the water, clear of every float and below the name.
+    assert(cta.y>=frame.y&&cta.y+cta.height<=frame.y+frame.height,`CTA should sit on the pool at ${viewport.width}px`);
+    if(mode==='live'){
+      const floats=await page.locator('.pool-obj').evaluateAll(els=>els.map(e=>{const r=e.getBoundingClientRect();return{x:r.x,y:r.y,r:parseFloat(e.style.getPropertyValue('--r'))||0,h:e.getAttribute('href')};}));
+      for(const f of floats){
+        const dx=Math.max(cta.x-f.x,0,f.x-cta.x-cta.width), dy=Math.max(cta.y-f.y,0,f.y-cta.y-cta.height);
+        assert(Math.hypot(dx,dy)>=f.r*.8,`CTA overlaps ${f.h} at ${viewport.width}px`);
+      }
+    }
+    await page.keyboard.press('Tab');
     assert((await page.locator('.pool__hint').innerText()).includes('floating object'),'Instruction missing');
     // Compare to the device width: on phones, innerWidth grows with wide content.
     const fits=()=>page.evaluate(w=>document.documentElement.scrollWidth<=w+1,viewport.width);
@@ -115,7 +124,16 @@ try {
     await page.locator('.story-collage').scrollIntoViewIfNeeded();
     await page.waitForFunction(()=>[...document.querySelectorAll('.story-collage img')].every(i=>i.complete&&i.naturalWidth>0),null,{timeout:15000});
     const story=await page.evaluate(()=>{const r=s=>document.querySelector(s).getBoundingClientRect();const c=r('.story-collage'),e=r('.story-grid .about-v6__chapter-main');return{c:{x:c.x,right:c.right,y:c.y,bottom:c.bottom},e:{x:e.x,right:e.right,y:e.y},n:document.querySelectorAll('.story-collage img').length,w:innerWidth};});
-    assert.equal(story.n,4,'Collage should show four real images');
+    assert.equal(story.n,5,'Collage should show five real images');
+    assert.equal(await page.locator('.story-collage img[src*="fanscope"]').count(),1,'FanScope screenshot missing from the collage');
+    // Boogaloo is for the essay paragraphs alone.
+    const fontOf=sel=>page.locator(sel).first().evaluate(e=>getComputedStyle(e).fontFamily.split(',')[0].replace(/["']/g,''));
+    assert.equal(await fontOf('.about-v6__story-copy p'),'Boogaloo');
+    for(const sel of ['.story-question','#about-v6-story','.about-v6__statement','.about-v6__education-entry p','.about-v6__principle-grid article p']) assert.notEqual(await fontOf(sel),'Boogaloo',`${sel} must not use Boogaloo`);
+    // "Martin Zhong" stays on one line.
+    const name=await page.locator('#about-v6-title em').evaluate(e=>({lines:e.getClientRects().length,right:e.getBoundingClientRect().right}));
+    assert.equal(name.lines,1,`Martin Zhong splits at ${viewport.width}px`);
+    assert(name.right<=viewport.width,`Martin Zhong overflows at ${viewport.width}px`);
     if(viewport.width>900) assert(story.c.right<=story.e.x+1,`Collage must sit left of the essay at ${viewport.width}px`);
     else assert(story.c.bottom<=story.e.y+1&&story.c.x>=0&&story.c.right<=viewport.width,`Collage must stack above the essay without overflow at ${viewport.width}px`);
     assert(await fits(),'Horizontal overflow on About');
@@ -204,6 +222,7 @@ try {
   for (const slug of slugs) assert.equal(await staticPage.locator(`.pool__objects a[href="/work/${slug}/"]`).count(),1, `No-JS pool link missing: ${slug}`);
   await nojs.close();
   const page=await browser.newPage(); await page.goto(`${origin}/?pool=static`); await page.waitForSelector('.pool--unsupported');
+  await page.emulateMedia({reducedMotion:'reduce'});
   await page.locator('.pool__cta').click(); await page.waitForURL('**/work/');
   await page.locator('.cards a[href="/work/meetfolio/"]').click(); await page.waitForURL('**/work/meetfolio/');
   await page.goto(`${origin}/work/`); await page.locator('[data-filter="client"]').click();
