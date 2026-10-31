@@ -27,11 +27,19 @@ const sampleWater = async page => {
     const {x,y,width:w,height:h} = frame;
     // Open water away from the floats and the name.
     const portrait = h > w;
-    const water = portrait ? mean(x+w*.42,y+h*.14,w*.16,h*.05) : mean(x+w*.3,y+h*.3,w*.1,h*.06);
+    const water = portrait ? mean(x+w*.3,y+h*.74,w*.16,h*.05) : mean(x+w*.42,y+h*.3,w*.16,h*.06);
+    // Brightness spread of open water just above the name. Neon caustics are
+    // bright cyan, not white, so a white-pixel count misses them; this does not.
+    // Measured: neon build 60, reference image 46, current water 33-37.
+    const d = g.getImageData((x+w*.3)*dpr,(y+h*.29)*dpr,w*.4*dpr,h*.1*dpr).data;
+    const lumas = [];
+    for (let i=0;i<d.length;i+=4) lumas.push(.2126*d[i]+.7152*d[i+1]+.0722*d[i+2]);
+    const avg = lumas.reduce((a,b)=>a+b,0)/lumas.length;
+    const spread = Math.sqrt(lumas.reduce((a,b)=>a+(b-avg)**2,0)/lumas.length);
     // Dark ink: the darkest small patch across the centre of the pool.
     let ink = 255;
     for (let i=0;i<30;i++) for (const row of [.42,.46,.5]) ink = Math.min(ink, luma(mean(x+w*(.22+i*.019),y+h*row,6,6)));
-    return { water, waterLuma: luma(water), ink };
+    return { water, waterLuma: luma(water), ink, spread, portrait };
   },{shot,frame,dpr:await page.evaluate(()=>devicePixelRatio)});
 };
 const checkLabels = async page => {
@@ -63,16 +71,20 @@ try {
     await checkLabels(page);
     for(const slug of slugs) assert(await page.locator(`a[href="/work/${slug}/"]`).count());
     for(const place of places) assert.equal(await page.locator(`.pool__objects a[href="/${place}/"]`).count(),1,`Pool link missing: ${place}`);
-    assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'Horizontal overflow');
+    // Compare to the device width: on phones, innerWidth grows with wide content.
+    const fits=()=>page.evaluate(w=>document.documentElement.scrollWidth<=w+1,viewport.width);
+    assert(await fits(),'Horizontal overflow');
     assert(await page.evaluate(()=>document.documentElement.scrollHeight<=innerHeight+1),`Home should fit one screen at ${viewport.width}`);
-    const fonts=await page.evaluate(async()=>{await document.fonts.ready;return ['400 40px Piedra','400 20px Geo','400 20px "Cherry Cream Soda"'].filter(f=>document.fonts.check(f)).length;});
-    assert.equal(fonts,3,'A brand font failed to load');
+    const fonts=await page.evaluate(async()=>{await document.fonts.ready;await document.fonts.load('400 16px "Special Elite"');return ['400 40px Piedra','400 20px Geo','400 20px "Cherry Cream Soda"','400 16px "Special Elite"'].filter(f=>document.fonts.check(f)).length;});
+    assert.equal(fonts,4,'A brand font failed to load');
     if(mode==='live'){
       const px=await sampleWater(page);
       const [r,g,b]=px.water;
       assert(b>g*.95&&g>r*1.25&&r<190,`Water is not turquoise: ${px.water.map(Math.round)}`);
       assert(px.waterLuma>120&&px.waterLuma<235,`Water is too dark or blown out: ${Math.round(px.waterLuma)}`);
       assert(px.ink<px.waterLuma*.62,`Name not visible on the pool floor: ink ${Math.round(px.ink)} vs water ${Math.round(px.waterLuma)}`);
+      console.log(`  water spread ${px.spread.toFixed(1)} at ${viewport.width}px`);
+      if(!px.portrait) assert(px.spread<52,`Caustics look neon: brightness spread ${px.spread.toFixed(1)}`);
     }
     await page.screenshot({path:`test-results/pool-${viewport.width}.png`});
     if(viewport.width===1440) {
@@ -90,14 +102,14 @@ try {
     await page.waitForTimeout(900);
     await page.screenshot({path:`test-results/about-${viewport.width}.png`,fullPage:true});
     assert(await page.locator('text=YBBE TECH').count());
-    assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
+    assert(await fits(),'Horizontal overflow on About');
     await page.goto(`${origin}/life/`,{waitUntil:'networkidle'});
     await page.locator('#gallery').scrollIntoViewIfNeeded();
     await page.waitForTimeout(900);
     await page.screenshot({path:`test-results/life-${viewport.width}.png`,fullPage:true});
     assert.equal(await page.locator('img[src*="group"]').count(),2, 'Preserve the approved running and hiking photographs');
     assert.equal(await page.locator('.about-v6__gallery img').count(),5);
-    assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
+    assert(await fits(),'Horizontal overflow on Life');
     // Primary navigation reaches all four pages and marks where you are.
     for(const [label,path] of [['About','/about/'],['Work','/work/'],['Life','/life/'],['Home','/']]) {
       await page.locator('.site-header nav a',{hasText:label}).click();
@@ -109,6 +121,8 @@ try {
     for(const slug of slugs) {
       await page.goto(`${origin}/work/${slug}/`,{waitUntil:'domcontentloaded'});
       assert.equal(await page.locator('strong').filter({hasText:/^Status & limits\.?$/}).count(),1, `Expected one status/limits section: ${slug}`);
+      await page.evaluate(()=>document.fonts.ready);
+      assert(await fits(),`Horizontal overflow on ${slug} at ${viewport.width}`);
     }
     assert.deepEqual(failures,[],`Browser/shader errors at ${viewport.width}px`);
     results.push({viewport,mode,labels:'pass',routes:'pass'});
@@ -139,6 +153,11 @@ try {
   const np=await narrow.newPage(); await np.goto(`${origin}/?pool=static`,{waitUntil:'networkidle'});
   assert(await np.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'Horizontal overflow at 320px');
   assert.equal(await np.locator('.site-header nav a').count(),4);
+  for(const path of ['about','work','life',...slugs.map(s=>`work/${s}`)]) {
+    await np.goto(`${origin}/${path}/`,{waitUntil:'networkidle'});
+    await np.evaluate(()=>document.fonts.ready);
+    assert(await np.evaluate(()=>document.documentElement.scrollWidth<=321),`Horizontal overflow on /${path}/ at 320px`);
+  }
   for(const [from,to] of [['/#projects','/work/'],['/#outside','/life/'],['/#contact','/about/#contact'],['/about/#outside','/life/']]) {
     await np.goto("about:blank"); await np.goto(`${origin}${from}`); await np.waitForURL(`${origin}${to}`);
   }

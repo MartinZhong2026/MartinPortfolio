@@ -100,7 +100,7 @@ const FACES: Record<BrandId, { body: string; ink: string; name: string | null; c
   'adapt-to-china': { body: '#f7f2ea', ink: '#1d3a5f', name: null, crop: 1, mark: 1 },
   meetfolio: { body: '#245a47', ink: '#ffffff', name: 'Meetfolio', crop: 0.72, mark: 0.54 },
   abtrace: { body: '#0f5c52', ink: '#ffffff', name: 'AbTrace', crop: 0.82, mark: 0.6 },
-  'document-ai': { body: '#f4f7fa', ink: '#1d3a5f', name: 'Document AI', crop: 0.86, mark: 0.6 },
+  'document-ai': { body: '#f4f7fa', ink: '#0d2746', name: 'Document AI', crop: 0.86, mark: 0.6 },
   fanscope: { body: '#173a63', ink: '#ffffff', name: 'FanScope', crop: 1, mark: 0.44 },
 };
 
@@ -129,7 +129,10 @@ function paintFace(id: BrandId, c: CanvasRenderingContext2D, size: number, icon:
     feather.addColorStop(1, 'rgba(0,0,0,0)');
     o.fillStyle = feather;
     o.fillRect(0, 0, size, size);
+    // Marks on a dark tile are screened on, so the tile melts into the cushion.
+    c.globalCompositeOperation = id === 'abtrace' ? 'screen' : 'source-over';
     c.drawImage(off, 0, 0);
+    c.globalCompositeOperation = 'source-over';
   }
   if (f.name) {
     c.fillStyle = f.ink;
@@ -165,7 +168,7 @@ function cushionGeometry(round: boolean) {
 function brandFloat(id: BrandId): BuiltObject {
   const round = id === 'adapt-to-china';
   const half = round ? 0.235 : 0.148;
-  const height = round ? 0.108 : 0.122;
+  const height = round ? 0.13 : 0.15;
   const { canvas, texture, c } = canvasTexture(512, 512);
   let icon: HTMLImageElement | null = null;
   const repaint = () => {
@@ -185,7 +188,7 @@ function brandFloat(id: BrandId): BuiltObject {
 
   const body = mesh(
     shared(round ? 'cushion-round' : 'cushion-square', () => cushionGeometry(round)),
-    vinyl('#ffffff', 0.44, { map: texture, clearcoat: 0.8, clearcoatRoughness: 0.2, envMapIntensity: 0.55 }),
+    vinyl('#ffffff', 0.5, { map: texture, clearcoat: 0.5, clearcoatRoughness: 0.24, envMapIntensity: 0.3 }),
     0,
     height * 0.14,
     0,
@@ -292,13 +295,11 @@ function swimRing(): BuiltObject {
     c.textAlign = 'center';
     c.textBaseline = 'middle';
     c.font = '400 58px "Cherry Cream Soda", Georgia, serif';
-    for (const i of [1, 5]) {
-      c.save();
-      c.translate((i + 0.5) * w, canvas.height * 0.25);
-      c.rotate(Math.PI);
-      c.fillText('Life', 0, 0);
-      c.restore();
-    }
+    c.save();
+    c.translate(1.5 * w, canvas.height * 0.25);
+    c.rotate(Math.PI);
+    c.fillText('Life', 0, 0);
+    c.restore();
     texture.needsUpdate = true;
   };
   paint();

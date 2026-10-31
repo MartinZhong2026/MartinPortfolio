@@ -12,12 +12,16 @@ const WATERLINE_Y = 0.04;
  *  - `footprint`: the hulls at the waterline, seen from straight above, in their
  *    own colours (rgb premultiplied, a = coverage).
  *  - `contact`: the footprint blurred, for the crease, meniscus and reflections.
+ *  - `halo`: the footprint blurred widely, in half float so its long tail stays
+ *    smooth. The water reads ripple rings from it.
  * The proxies share geometry and textures, but own their materials and targets.
  */
 export class FloatShadows {
   readonly target: THREE.WebGLRenderTarget;
   readonly footprint: THREE.WebGLRenderTarget;
   readonly contact: THREE.WebGLRenderTarget;
+  readonly halo: THREE.WebGLRenderTarget;
+  private haloScratch: THREE.WebGLRenderTarget;
   private scratch: THREE.WebGLRenderTarget;
   private contactScratch: THREE.WebGLRenderTarget;
   private scene = new THREE.Scene();
@@ -37,6 +41,8 @@ export class FloatShadows {
     this.footprint = new THREE.WebGLRenderTarget(w, h, options);
     this.contact = new THREE.WebGLRenderTarget(192, 120, options);
     this.contactScratch = new THREE.WebGLRenderTarget(192, 120, options);
+    this.halo = new THREE.WebGLRenderTarget(96, 60, { ...options, type: THREE.HalfFloatType });
+    this.haloScratch = new THREE.WebGLRenderTarget(96, 60, { ...options, type: THREE.HalfFloatType });
 
     for (const root of roots) root.traverse((node) => {
       if (!(node instanceof THREE.Mesh) || (node.material as THREE.Material).visible === false) return;
@@ -125,10 +131,12 @@ export class FloatShadows {
     r.clear();
     r.render(this.footprintScene, this.camera);
     this.blur(this.footprint, this.contactScratch, this.contact, 1.25);
+    this.blur(this.contact, this.haloScratch, this.halo, 1.6);
+    this.blur(this.halo, this.haloScratch, this.halo, 2.4);
   }
 
   dispose() {
-    [this.target, this.scratch, this.footprint, this.contact, this.contactScratch].forEach((t) => t.dispose());
+    [this.target, this.scratch, this.footprint, this.contact, this.contactScratch, this.halo, this.haloScratch].forEach((t) => t.dispose());
     this.blurMat.dispose();
     this.quad.geometry.dispose();
     this.materials.forEach((m) => m.dispose());

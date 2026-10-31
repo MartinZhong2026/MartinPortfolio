@@ -272,7 +272,7 @@ export class PoolEngine {
         light: this.shared.light,
         halfSize: this.shared.halfSize,
         depth: this.shared.depth,
-        focusGain: { value: 8.5 },
+        focusGain: { value: 9.5 },
       },
       blending: THREE.AdditiveBlending,
       transparent: true,
@@ -297,6 +297,7 @@ export class PoolEngine {
         time: { value: 0 },
         footprintTex: { value: null },
         contactTex: { value: null },
+        haloTex: { value: null },
         rippleTex: { value: this.rippleTex },
       },
     });
@@ -344,7 +345,7 @@ export class PoolEngine {
 
     // Satin-metal pool rails: a lightweight, physically lit detail at the
     // upper-left coping in the approved homepage reference.
-    const railMat = new THREE.MeshStandardMaterial({ color: 0xd0dee3, metalness: 0.83, roughness: 0.23 });
+    const railMat = new THREE.MeshStandardMaterial({ color: 0xeef3f6, metalness: 0.92, roughness: 0.16 });
     for (const z of [-0.79, -0.54]) {
       const railCurve = new THREE.CatmullRomCurve3([
         new THREE.Vector3(-W - 0.15, 0.19, z),
@@ -353,7 +354,7 @@ export class PoolEngine {
         new THREE.Vector3(-W + 0.115, 0.015, z),
         new THREE.Vector3(-W + 0.17, -0.24, z),
       ]);
-      const rail = new THREE.Mesh(new THREE.TubeGeometry(railCurve, 28, 0.012, 10, false), railMat);
+      const rail = new THREE.Mesh(new THREE.TubeGeometry(railCurve, 28, 0.017, 10, false), railMat);
       this.scene.add(rail);
     }
 
@@ -402,6 +403,7 @@ export class PoolEngine {
     this.shared.shadowTex.value = this.floatShadows.target.texture;
     this.waterMat.uniforms.footprintTex.value = this.floatShadows.footprint.texture;
     this.waterMat.uniforms.contactTex.value = this.floatShadows.contact.texture;
+    this.waterMat.uniforms.haloTex.value = this.floatShadows.halo.texture;
     this.bind();
     this.resize(true);
     // A few opening drops so the first frame already looks like water.
@@ -453,7 +455,7 @@ export class PoolEngine {
         }
       }
       if (p.distanceTo(this.pointer.lastDrop) > 0.045) {
-        const strength = this.pointer.down ? 0.0114 : e.pointerType === 'mouse' ? 0.0054 : 0.0072;
+        const strength = this.pointer.down ? 0.0066 : e.pointerType === 'mouse' ? 0.0026 : 0.004;
         this.queueDrop(p.x, p.y, this.pointer.down ? 0.075 : 0.055, strength);
         this.pointer.lastDrop.copy(p);
       }
@@ -759,11 +761,11 @@ export class PoolEngine {
       const u = this.causticBlur.uniforms;
       this.simQuad.material = this.causticBlur;
       u.tex.value = this.causticRT.texture;
-      u.direction.value.set(0.7 / this.causticRT.width, 0);
+      u.direction.value.set(0.55 / this.causticRT.width, 0);
       r.setRenderTarget(this.causticScratch);
       r.render(this.simScene, this.simCam);
       u.tex.value = this.causticScratch.texture;
-      u.direction.value.set(0, 0.7 / this.causticRT.height);
+      u.direction.value.set(0, 0.55 / this.causticRT.height);
       r.setRenderTarget(this.causticRT);
       r.render(this.simScene, this.simCam);
     }
@@ -771,7 +773,7 @@ export class PoolEngine {
     // --- Main view
     this.floatShadows.render();
     this.waterMat.uniforms.water.value = this.rtA.texture;
-    this.waterMat.uniforms.time.value = this.time;
+    this.waterMat.uniforms.time.value = rm ? 0 : this.time;
     this.shared.poolTime.value = rm ? 0 : this.time;
     r.setRenderTarget(null);
     r.setClearColor(0xf5f0e7, 1);
@@ -854,7 +856,7 @@ export class PoolEngine {
         if (speed > 0.05) this.queueDrop(o.pos.x - o.vel.x * 0.15, o.pos.y - o.vel.y * 0.15, r * 0.6, speed * 0.004);
         // An occasional low ring off the hull, as the float settles.
         if (!rm && this.time >= o.nextRipple) {
-          this.queueDrop(o.pos.x, o.pos.y, Math.max(0.05, r * 0.72), -0.016);
+          this.queueDrop(o.pos.x, o.pos.y, Math.max(0.05, r * 0.72), -0.01);
           o.nextRipple = this.time + 1.3 + 0.2 * o.phase;
         }
       }
