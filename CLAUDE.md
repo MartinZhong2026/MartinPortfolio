@@ -14,6 +14,7 @@ Read [AGENTS.md](AGENTS.md) first: it holds the project rules, commands, design 
 
 - Judge the pool at a few moments, not one frame, and after moving the pointer. Caustics vary over time and pointer ripples sharpen them, so a pool can pass idle and turn neon when stirred.
 - A new visual test must fail on a known-bad build. Run it against the old code before trusting it.
+- Emulation does not prove a mobile GPU fix. Say so, and point to `docs/MOBILE_TESTING.md`. `?poolfx=` switches isolate an effect on a real phone.
 - Crop close-ups of floats at 2× before calling modelling or water contact finished.
 - Compare performance by alternating runs of both builds. Single SwiftShader runs vary by more than most real changes.
 - `?pool=static` shows the fallback. Check it when changing floats, labels or the pool layout.

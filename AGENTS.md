@@ -45,6 +45,7 @@ npm run typecheck
 npm test                  # typecheck + build + content checks
 npm run test:e2e          # real browser; needs `npx playwright install chromium`
 npm run test:about        # About layout at four viewports (needs a build)
+npm run test:mobile       # phone overlaps, touch, flicker gate (needs a build)
 npm run test:v62:source   # source-level content checks
 npm run capture           # screenshots to test-results/capture/ (see flags in the script)
 node scripts/gen-story.mjs  # regenerate src/data/story.ts from the approved essay
@@ -93,7 +94,9 @@ Read the Pool section of [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) before cha
 - **`WAVES` is shared.** GPU refraction, caustics and CPU buoyancy all read it. Change amplitudes in one place and retune `focusGain`.
 - **Water and deck bypass tone mapping.** Their colours are display values, hand-graded in `shaders.ts`. Three.js materials are tone mapped (Neutral), so tune the two separately.
 - **Keep `ids` and DOM links in step.** Each `poolItems` entry needs a builder in `objects.ts` and a slot in both layouts in `layout.ts`. `toyBuilders` and `toySlots` must stay the same length.
-- **Mobile budget.** Touch devices get smaller targets, a pixel ratio cap of 1.5 and caustics on alternate frames. Avoid new full-screen passes, and test any change at 390×844.
+- **Mobile budget.** Touch devices get smaller targets and a pixel ratio cap of 1.5. Avoid new full-screen passes, and test any change at 390×844.
+- **Never refresh the caustics less than once a frame.** Skipping frames makes the focus lines jump, which reads as bright flashes on phones. See "Caustics and flicker" in the architecture notes. Run `node scripts/flicker.mjs --only base --fps 30` after changing waves, `focusGain` or the caustic pipeline.
+- **Portrait is a fixed composition.** Labels are pinned and floats stay in cells. Run `npm run test:mobile` after moving anything in `portraitLayout` or `toySlots`.
 
 ## Do not regress
 

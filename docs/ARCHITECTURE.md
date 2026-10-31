@@ -62,7 +62,18 @@ There is no client-side router: links are full page loads. Same-origin cross-fad
 - **Caustics**, through `causticsVert`, which multiplies slope by `focusGain` because the pool is shallow, then limits steep slopes so a stirred pool stays soft. The result is physically derived, not a painted pattern. Past the sun-side wall no light lands, which is what draws the wall's shadow.
 - **Buoyancy**, through `swellAt()`, a CPU copy of the longest three waves.
 
-The caustic map is deliberately small (512 wide, 384 on touch devices) and blurred in two passes. `poolSurface()` samples it three times, offset by wavelength for slight dispersion, breaks it into slow patches, and rolls off the peaks. Tiles are lit as ambient plus that sun term. The brightest light is added as white rather than multiplied into the tile colour, which is what keeps it from reading as neon cyan.
+The caustic map is deliberately small (512 wide, 384 on touch devices) and blurred. `poolSurface()` samples it three times, offset by wavelength for slight dispersion, breaks it into slow patches, and rolls off the peaks. Tiles are lit as ambient plus that sun term. The brightest light is added as white rather than multiplied into the tile colour, which is what keeps it from reading as neon cyan.
+
+#### Caustics and flicker
+
+Focus lines are thin and bright, and they travel several of their own widths between frames. Shown as they are, a line jumps, and a long thin jump reads as a flash. On phones the crests of the longest wave lie at about +40° on a portrait screen, so the flashes ran upper-left to lower-right. Four things prevent this:
+
+- **Settling.** `causticRaw` holds the latest map. The map the pool samples, `causticRT`, eases towards it over a fixed time (`causticSettle`), whatever the frame rate.
+- **Every frame.** The map refreshes on every frame. Never refresh it less often to save time: that is what caused the flashes. `adaptQuality()` slows the waves (`windRate`) and lengthens the settling instead. `windClock` accumulates time, so the rate can change without the waves jumping.
+- **Slower waves on touch devices.** `windRate` is 0.55 there, and buoyancy reads the same clock, so the floats stay in step with the water.
+- **No derivatives on touch devices.** Under `VERTEX_AREA`, `causticsVert` measures how much light gathers from neighbouring vertices, so the result does not depend on how a GPU computes `dFdx` on thin triangles. Desktop keeps the derivative path.
+
+Lane edges are anti-aliased for the same reason: seen through moving water, a hard edge flips whole rows of pixels at once.
 
 `waterFrag` then adds absorption, in-scattering, deeper colour towards the walls, Fresnel sky reflection, sun glitter, and the contact effects below. `rippleTex` is a tiling slope map built once by `buildRippleMap()`. Two scrolling samples give the surface fine detail at a fixed cost, and it never reaches the caustics.
 
@@ -89,6 +100,8 @@ Geometry above `WATERLINE_Y` is discarded from the footprint, so only what actua
 
 `updateObjects()` applies a spring toward each home position, pointer and collision impulses, and a mass-weighted spring to the local swell. `layout.ts` is the single source of positions for both the live scene and the CSS fallback, in screen-normalised coordinates. Adjust slots there, not in the engine. `toySlots` holds the toys; the fallback does not show them.
 
+Portrait is a fixed composition, because a narrow pool has no room to spare. Each slot in `portraitLayout` names the side its label is pinned to (`pinLabel()`), so a label never searches for a spot. Project floats may leave their home by only `CELL_FLOAT` and toys by `CELL_TOY`, and a toy gives way entirely when it meets a project float. Keep this in mind when moving a slot: run `npm run test:mobile`, which measures every pair of objects.
+
 ### Lighting
 
 One `light` direction is used by caustics, shadows, the directional light and a procedural sky dome baked to an environment map, so reflections agree with shadows. The sun sits high and to the side so its mirror image, the glitter zone, stays off the name. The camera is tilted (`TILT_LANDSCAPE`, `TILT_PORTRAIT`) so the far wall and the sides of the floats show, and `resize()` backs it off until the near rim fits the frame. In portrait the camera turns 90°, so `resize()` turns the sun with it to keep shadows falling screen lower-right. Palm shadows come from a small canvas (`paintFoliage`) sampled by the deck and pool floor shaders. Water and deck output display-referred colour directly; Three.js materials use Neutral tone mapping so brand colours hold.
@@ -101,9 +114,9 @@ One `light` direction is used by caustics, shadows, the directional light and a 
 
 - Three.js is a lazy chunk; the first paint is static HTML.
 - The loop stops when the canvas is off-screen or the tab is hidden.
-- Pixel ratio is capped at 2, or 1.5 on touch devices. Touch devices also use smaller targets and refresh caustics on alternate frames.
+- Pixel ratio is capped at 2, or 1.5 on touch devices. Touch devices also use smaller targets.
 - Water shaders read textures instead of looping over objects, so floats add draw calls but no per-pixel cost.
-- `adaptQuality()` measures after warm-up. Under 40 fps it drops the pixel ratio to 1, then halves the caustic rate.
+- `adaptQuality()` measures after warm-up. Under 40 fps it drops the pixel ratio to 1, then slows and softens the light. Resizing clears the canvas, so both it and `resize()` redraw straight away, or the browser would show a blank frame.
 
 ## Assets, fonts and styling
 
@@ -114,7 +127,7 @@ One `light` direction is used by caustics, shadows, the directional light and a 
 ## Responsive behaviour and accessibility
 
 - **Layout.** Pool size comes from `--fw`/`--fh`, calculated from viewport width and height. At `max-aspect-ratio: 5/6` the pool becomes portrait: the engine detects `frame.height > frame.width`, rotates the camera and uses `portraitLayout`. Below 560px the header drops the brand name to fit four links.
-- **Labels.** Floats print their own names, so labels appear on hover and keyboard focus. On touch devices, where print is too small and there is no hover, they stay on. `labels.ts` places them each frame, avoiding other labels, floats and the name.
+- **Labels.** Floats print their own names, so labels appear on hover and keyboard focus. On touch devices, where print is too small and there is no hover, they stay on. In landscape, `labels.ts` places them each frame, avoiding other labels, floats and the name.
 - **Semantics.** The canvas is `aria-hidden`. Every float is a real `<a>`, so keyboard and screen-reader users get the same navigation; focus also highlights the float. Home has a visually hidden `h1`, and a skip link leads every page.
 - **Fallbacks.** Without JavaScript or WebGL2, or with `?pool=static`, the CSS pool shows the same links. Losing the WebGL context switches to it too, and a restored context rebuilds the engine.
 - **Motion.** `prefers-reduced-motion` freezes wind, parallax, idle animation and the dive, leaving a still but lit pool.
@@ -136,5 +149,6 @@ Before launch, set `site.origin` in `src/data/site.ts` to enable canonical URLs 
 | --- | --- |
 | `npm test` | Types, build, and `check-content.mjs`: routes, content rules, consent, images, fonts, the About essay against its approved copy, no employer or internship references on any page, and the exact external links on Adapt to China and FanScope |
 | `npm run test:e2e` | Chromium with software WebGL at 1440, 1024 and 390 wide: live pool, pixel checks on water colour, brightness spread (the neon guard) and the name, float hover and click, nav, one-screen Home, fonts, labels, keyboard, reduced motion, no-JS, fallback, redirects, filters, 404 |
+| `npm run test:mobile` | Overlaps of labels, floats, toys, the name and the call to action on animated frames at phone sizes, after a finger drag; a touch on every float and label; and the flicker gate. See [MOBILE_TESTING.md](MOBILE_TESTING.md) |
 | `npm run test:about` | About reading order and layout at four viewports |
 | `npm run test:v62:source` | Source-level checks of approved content |

@@ -2,7 +2,7 @@
 
 Martin Zhong's personal portfolio. The homepage is an interactive WebGL swimming pool: branded cushions lead to five case studies, a paper boat leads to About, a swim ring leads to Life, and a few small toys drift around for company.
 
-Built with React (static rendering), TypeScript, esbuild and Three.js. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for how it works and [AGENTS.md](AGENTS.md) for contribution rules.
+Built with React (static rendering), TypeScript, esbuild and Three.js. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for how it works, [docs/MOBILE_TESTING.md](docs/MOBILE_TESTING.md) for testing on a real phone, and [AGENTS.md](AGENTS.md) for contribution rules.
 
 ## Getting started
 
@@ -28,6 +28,7 @@ Add `?pool=static` to the URL to see the fallback used without WebGL. Opening HT
 | `npm test` | Typecheck, build and content checks |
 | `npm run test:e2e` | Real-browser acceptance tests |
 | `npm run test:about` | About page layout checks |
+| `npm run test:mobile` | Phone layout, touch and flicker checks |
 | `npm run test:v62:source` | Source-level content checks |
 | `npm run capture` | Screenshots to `test-results/capture/` |
 
