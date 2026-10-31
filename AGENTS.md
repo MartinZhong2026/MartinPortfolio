@@ -69,6 +69,7 @@ Keep the V6 identity: warm paper, deep ink, editorial spacing, aqua accents. Tok
 | --- | --- | --- | --- |
 | Display | Piedra | `--font-display` | The name, `h1`, `h2`, card titles. 24px or larger. One weight, no italic |
 | Reading | Special Elite | `--font-body` | All long-form body text: paragraphs, summaries, quotations |
+| Story | Boogaloo | `--font-story` | The paragraphs of the About story, and nothing else |
 | Editorial | Cherry Cream Soda | `--font-editorial` | One short statement at a time; nav, buttons, pool labels, printed float names |
 | Label | Geo | `--font-label` | "welcome to my world", eyebrows, hints, in sentence case |
 | Small headings | Source Serif 4 | `--font-serif` | `h3`, `h4`, bold names, mock UI, pool tooltips |
@@ -86,11 +87,12 @@ Read the Pool section of [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) before cha
 
 - **The water mesh is opaque.** Anything below y = 0 is hidden and is drawn by the water shader from the footprint map. A float that rocks too far dips through the surface, which is why every object declares `maxTilt`.
 - **The look is soft on purpose.** Caustics stay broad and white, never a bright cyan web. Long waves shape them; fine detail comes from `rippleTex`, which never reaches the caustics. Before raising `focusGain`, wave slopes or pointer drop strength, check a stirred pool, not just an idle one. `test:e2e` fails if the water's brightness spread reaches 52.
-- **Ducks are decoration.** They have no link, hit target or label, and they wander. Keep their slots in `duckSlots` clear of the name on the floor.
+- **Toys are decoration.** Ducks, the beach ball, doughnut ring and turtle have no link, hit target or label, and they wander. Keep their slots in `toySlots` clear of the name on the floor. Add few: they stay secondary to the project floats.
+- **The call to action floats on the water.** `CTA_LANDSCAPE` and `CTA_PORTRAIT` in `PoolEngine.ts` set where it sits. The engine projects that point for the DOM link and keeps floats out of the area.
 - **Water shaders never loop over objects.** Per-object data reaches the water through `FloatShadows` textures, so adding a float adds no per-pixel cost.
 - **`WAVES` is shared.** GPU refraction, caustics and CPU buoyancy all read it. Change amplitudes in one place and retune `focusGain`.
 - **Water and deck bypass tone mapping.** Their colours are display values, hand-graded in `shaders.ts`. Three.js materials are tone mapped (Neutral), so tune the two separately.
-- **Keep `ids` and DOM links in step.** Each `poolItems` entry needs a builder in `objects.ts` and a slot in both layouts in `layout.ts`. `duckBuilders` and `duckSlots` must stay the same length.
+- **Keep `ids` and DOM links in step.** Each `poolItems` entry needs a builder in `objects.ts` and a slot in both layouts in `layout.ts`. `toyBuilders` and `toySlots` must stay the same length.
 - **Mobile budget.** Touch devices get smaller targets, a pixel ratio cap of 1.5 and caustics on alternate frames. Avoid new full-screen passes, and test any change at 390×844.
 
 ## Do not regress
