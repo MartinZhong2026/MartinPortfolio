@@ -1,9 +1,17 @@
 import type { PoolObjectId } from '../pool/layout';
 
 /** Brand images for project cards and the 3D pool's static fallback.
- * The About link retains its accessible folded-paper boat symbol. */
+ * About and Life have small drawn symbols: a folded-paper boat and a swim ring. */
 export function Glyph({ id, className }: { id: PoolObjectId; className?: string }) {
   const common = { viewBox: '0 0 120 120', className, 'aria-hidden': true as const, focusable: 'false' as const };
+  if (id === 'life') {
+    return (
+      <svg {...common}>
+        <circle cx="60" cy="60" r="38" fill="none" stroke="#fff8ee" strokeWidth="24" />
+        <circle cx="60" cy="60" r="38" fill="none" stroke="#f2553d" strokeWidth="24" strokeDasharray="29.8 29.8" />
+      </svg>
+    );
+  }
   if (id !== 'about') {
     const file = id === 'supplier-document-intelligence' ? 'document-ai' : id;
     return <img src={`/assets/icons/${file}.png`} className={className} width={512} height={512} alt="" aria-hidden="true" decoding="async" />;

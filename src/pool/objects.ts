@@ -1,22 +1,27 @@
 import * as THREE from 'three';
-import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
+import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type { PoolObjectId } from './layout';
 
 /**
- * Branded 3D rounded floats use local app icon textures and physical
- * beveled side shells; About uses a folded paper-boat mesh. Every builder returns a group whose top face points +y,
- * whose "screen-up" points -z and whose waterline sits at y = 0.
+ * Everything floating in the pool. Projects are thick branded cushions, a paper
+ * boat sails to About, a swim ring to Life, and a few rubber ducks drift around
+ * for company. Every builder returns a group whose top faces +y, whose
+ * "screen-up" points -z and whose waterline sits at y = 0. Anything below y = 0
+ * is hidden by the opaque water mesh and drawn by the water shader from the
+ * footprint map instead (FloatShadows).
  */
 export interface BuiltObject {
   group: THREE.Group;
-  /** footprint half extents in local x / z (before yaw) */
-  hx: number;
-  hz: number;
+  /** radius used for collisions, labels and the hit target */
+  radius: number;
   /** total height above the waterline */
   top: number;
-  /** footprint used by the water shader: 0 rounded square, 1 disc, -1 none */
-  shape: number;
-  updateWater?(water: THREE.Texture, halfSize: THREE.Vector2, bob: number): void;
+  /** how sluggishly it answers the swell: 1 = small and light */
+  mass: number;
+  /** radians it can rock before its low edge meets the water */
+  maxTilt: number;
+  /** per-frame idle life: hover is 0…1, drift is the float's speed */
+  animate?(time: number, hover: number, drift: number): void;
 }
 
 const disposables: { dispose(): void }[] = [];
@@ -26,282 +31,436 @@ const track = <T extends { dispose(): void }>(x: T): T => {
 };
 export const disposeObjectResources = () => {
   while (disposables.length) disposables.pop()!.dispose();
+  Object.keys(sharedGeometry).forEach((key) => delete sharedGeometry[key]);
 };
 
-const clay = (color: string, roughness = 0.5, extra: THREE.MeshPhysicalMaterialParameters = {}) =>
-  track(
-    new THREE.MeshPhysicalMaterial({
-      color,
-      roughness,
-      metalness: 0,
-      clearcoat: 0.4,
-      clearcoatRoughness: 0.35,
-      ...extra,
-    }),
-  );
+const vinyl = (color: string, roughness = 0.3, extra: THREE.MeshPhysicalMaterialParameters = {}) =>
+  track(new THREE.MeshPhysicalMaterial({ color, roughness, metalness: 0, clearcoat: 0.7, clearcoatRoughness: 0.22, ...extra }));
 
+const matte = (color: string, roughness = 0.5, metalness = 0) => track(new THREE.MeshStandardMaterial({ color, roughness, metalness }));
 
-const rbox = (w: number, h: number, d: number, r: number, seg = 4) =>
-  track(new RoundedBoxGeometry(w, h, d, seg, Math.min(r, w / 2, h / 2, d / 2)));
+/** Ducks repeat, so their geometry is built once and shared. */
+const sharedGeometry: Record<string, THREE.BufferGeometry> = {};
+const shared = (key: string, build: () => THREE.BufferGeometry) => (sharedGeometry[key] ??= track(build()));
 
-function mesh(geo: THREE.BufferGeometry, mat: THREE.Material, x = 0, y = 0, z = 0, ry = 0): THREE.Mesh {
+function mesh(geo: THREE.BufferGeometry, mat: THREE.Material, x = 0, y = 0, z = 0): THREE.Mesh {
   const m = new THREE.Mesh(geo, mat);
   m.position.set(x, y, z);
-  m.rotation.y = ry;
   return m;
 }
 
-/* ------------------------------------------------------------- */
-/* Canvas helpers                                                   */
-/* ------------------------------------------------------------- */
-const roundRectPath = (c: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) => {
-  c.beginPath();
-  c.moveTo(x + r, y);
-  c.arcTo(x + w, y, x + w, y + h, r);
-  c.arcTo(x + w, y + h, x, y + h, r);
-  c.arcTo(x, y + h, x, y, r);
-  c.arcTo(x, y, x + w, y, r);
-  c.closePath();
+/** A sphere pushed around per-vertex, welded so it shades without a seam. */
+function sculptedSphere(detail: [number, number], shape: (v: THREE.Vector3) => void) {
+  const raw = new THREE.SphereGeometry(1, detail[0], detail[1]);
+  raw.deleteAttribute('uv');
+  raw.deleteAttribute('normal');
+  const geo = mergeVertices(raw, 1e-4);
+  raw.dispose();
+  const p = geo.getAttribute('position') as THREE.BufferAttribute;
+  const v = new THREE.Vector3();
+  for (let i = 0; i < p.count; i++) {
+    v.fromBufferAttribute(p, i);
+    shape(v);
+    p.setXYZ(i, v.x, v.y, v.z);
+  }
+  geo.computeVertexNormals();
+  return geo;
+}
+
+const ramp = (a: number, b: number, x: number) => {
+  const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
+  return t * t * (3 - 2 * t);
 };
+
+const signedPow = (n: number, e: number) => Math.sign(n) * Math.pow(Math.abs(n), e);
 
 const fontsReady = (): Promise<void> => {
   const f = (globalThis as { document?: Document }).document?.fonts;
   if (!f) return Promise.resolve();
-  return Promise.all([f.load('700 64px "Source Serif 4"'), f.load('italic 500 40px "Source Serif 4"')])
-    .then(() => undefined)
-    .catch(() => undefined);
+  return f.load('400 40px "Cherry Cream Soda"').then(() => undefined).catch(() => undefined);
 };
 
-/* ------------------------------------------------------------- */
-/* About — Martin's paper boat                                     */
-/* ------------------------------------------------------------- */
-function paperBoat(): BuiltObject {
-  const g = new THREE.Group();
-  const H = 0.085; // gunwale height
-  const A = 0.235; // bow/stern half length at the top
-  const B = 0.12; // keel half length
-  const W = 0.085; // half beam at the top
-  const K = -0.025; // keel height
-  // Hull side texture carries the name, like the printed boat in the reference.
-  const sideCanvas = document.createElement('canvas');
-  sideCanvas.width = 1024;
-  sideCanvas.height = 256;
-  const sideTex = track(new THREE.CanvasTexture(sideCanvas));
-  sideTex.colorSpace = THREE.SRGBColorSpace;
-  sideTex.anisotropy = 8;
-  const paintSide = () => {
-    const c = sideCanvas.getContext('2d');
-    if (!c) return;
-    const grad = c.createLinearGradient(0, 0, 0, 256);
-    grad.addColorStop(0, '#ffffff');
-    grad.addColorStop(1, '#eef0ee');
-    c.fillStyle = grad;
-    c.fillRect(0, 0, 1024, 256);
-    c.strokeStyle = 'rgba(120,140,150,0.18)';
-    c.lineWidth = 3;
-    c.beginPath();
-    c.moveTo(512, 0);
-    c.lineTo(512, 256);
-    c.stroke();
-    c.fillStyle = '#16345a';
-    c.font = 'italic 800 104px "Instrument Sans", Arial, sans-serif';
-    c.textAlign = 'center';
-    c.textBaseline = 'middle';
-    c.save();
-    c.translate(512, 118);
-    c.rotate(-0.06);
-    c.fillText('About Martin', 0, 0, 760);
-    c.restore();
-    sideTex.needsUpdate = true;
-  };
-  paintSide();
-  fontsReady().then(paintSide);
-
-  const paper = clay('#fbfbf8', 0.82, { side: THREE.DoubleSide, clearcoat: 0.05 });
-  const paperShade = clay('#e6ebe8', 0.86, { side: THREE.DoubleSide, clearcoat: 0 });
-  const printed = track(new THREE.MeshStandardMaterial({ map: sideTex, roughness: 0.85, side: THREE.DoubleSide }));
-
-  const geo = (pos: number[], uv?: number[]) => {
-    const b = track(new THREE.BufferGeometry());
-    b.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-    if (uv) b.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
-    b.computeVertexNormals();
-    return b;
-  };
-  const uvOf = (x: number, y: number) => [(x + A) / (2 * A), (y - K) / (H - K)];
-  for (const side of [1, -1]) {
-    const bow = [-A, H, 0], ul = [-0.11, H, side * W], ur = [0.11, H, side * W], stern = [A, H, 0];
-    const kl = [-B, K, 0], kr = [B, K, 0];
-    const tris = [bow, kl, ul, ul, kl, kr, ul, kr, ur, ur, kr, stern];
-    const pos = tris.flat();
-    const uv = tris.flatMap(([x, y]) => uvOf(x, y));
-    g.add(new THREE.Mesh(geo(pos, uv), side > 0 ? printed : paper));
-  }
-  // Inside of the hull (seen from above) and the two-layer sail.
-  g.add(new THREE.Mesh(geo([-A, H - 0.004, 0, -0.11, H - 0.004, W, 0.11, H - 0.004, W, -A, H - 0.004, 0, 0.11, H - 0.004, W, A, H - 0.004, 0,
-    -A, H - 0.004, 0, 0.11, H - 0.004, -W, -0.11, H - 0.004, -W, -A, H - 0.004, 0, A, H - 0.004, 0, 0.11, H - 0.004, -W]), paperShade));
-  for (const side of [1, -1]) {
-    g.add(new THREE.Mesh(geo([-0.12, H, side * 0.022, 0.12, H, side * 0.022, 0, H + 0.16, 0]), side > 0 ? paper : paperShade));
-  }
-  // Tip the boat toward the overhead camera so the printed side and the sail read.
-  g.rotation.x = -1.05;
-  g.position.y = 0.035;
-  const wrap = new THREE.Group();
-  wrap.add(g);
-  return { group: wrap, hx: 0.235, hz: 0.12, top: 0.16, shape: -1 };
+function canvasTexture(width: number, height: number) {
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const texture = track(new THREE.CanvasTexture(canvas));
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.anisotropy = 8;
+  return { canvas, texture, c: canvas.getContext('2d') };
 }
 
+/* ------------------------------------------------------------- */
+/* Project cushions                                                 */
+/* ------------------------------------------------------------- */
 type BrandId = 'meetfolio' | 'abtrace' | 'document-ai' | 'fanscope' | 'adapt-to-china';
 
-const FACE: Record<BrandId, { body: string; ink: string; name: string | null }> = {
-  'adapt-to-china': { body: '#f7f2ea', ink: '#1d3a5f', name: null },
-  meetfolio: { body: '#2b5f4c', ink: '#ffffff', name: 'Meetfolio' },
-  abtrace: { body: '#0f5c52', ink: '#ffffff', name: 'AbTrace' },
-  'document-ai': { body: '#f4f7fa', ink: '#1d3a5f', name: 'Document AI' },
-  fanscope: { body: '#173a63', ink: '#ffffff', name: 'FanScope' },
+/** Share of each supplied icon that holds the mark, and how much of the face it fills. */
+const FACES: Record<BrandId, { body: string; ink: string; name: string | null; crop: number; mark: number }> = {
+  'adapt-to-china': { body: '#f7f2ea', ink: '#1d3a5f', name: null, crop: 1, mark: 1 },
+  meetfolio: { body: '#245a47', ink: '#ffffff', name: 'Meetfolio', crop: 0.72, mark: 0.54 },
+  abtrace: { body: '#0f5c52', ink: '#ffffff', name: 'AbTrace', crop: 0.82, mark: 0.6 },
+  'document-ai': { body: '#f4f7fa', ink: '#0d2746', name: 'Document AI', crop: 0.86, mark: 0.6 },
+  fanscope: { body: '#173a63', ink: '#ffffff', name: 'FanScope', crop: 1, mark: 0.44 },
 };
 
-/** Paint the top face of a float: brand mark + printed name, like an app-icon cushion. */
-function paintFace(id: BrandId, canvas: HTMLCanvasElement, icon: HTMLImageElement | null, round: boolean) {
-  const S = canvas.width;
-  const c = canvas.getContext('2d');
-  if (!c) return;
-  const f = FACE[id];
-  c.clearRect(0, 0, S, S);
-  c.save();
-  if (round) {
-    c.beginPath();
-    c.arc(S / 2, S / 2, S / 2, 0, Math.PI * 2);
-  } else roundRectPath(c, 0, 0, S, S, S * 0.2);
-  c.clip();
+/** Paint the cushion's top: the brand mark, feathered into its colour, and its name. */
+function paintFace(id: BrandId, c: CanvasRenderingContext2D, size: number, icon: HTMLImageElement | null) {
+  const f = FACES[id];
+  c.clearRect(0, 0, size, size);
   c.fillStyle = f.body;
-  c.fillRect(0, 0, S, S);
-
-  if (id === 'adapt-to-china') {
-    if (icon) c.drawImage(icon, 0, 0, S, S);
-  } else if (id === 'fanscope') {
-    // Brand mark redrawn crisply: teal tile with a white play mark.
-    const t = S * 0.4, x = (S - t) / 2, y = S * 0.14;
-    const g = c.createLinearGradient(x, y, x + t, y + t);
-    g.addColorStop(0, '#5fd4c8');
-    g.addColorStop(1, '#1f9a96');
-    c.fillStyle = g;
-    roundRectPath(c, x, y, t, t, t * 0.24);
-    c.fill();
-    c.fillStyle = '#ffffff';
-    c.beginPath();
-    c.moveTo(x + t * 0.38, y + t * 0.3);
-    c.lineTo(x + t * 0.38, y + t * 0.7);
-    c.lineTo(x + t * 0.72, y + t * 0.5);
-    c.closePath();
-    c.fill();
+  c.fillRect(0, 0, size, size);
+  if (icon && id === 'adapt-to-china') {
+    const inset = size * 0.08;
+    c.drawImage(icon, inset, inset, size - inset * 2, size - inset * 2);
   } else if (icon) {
-    // Crop the mark out of the supplied icon and feather it into the cushion colour.
     const off = document.createElement('canvas');
-    off.width = off.height = S;
+    off.width = off.height = size;
     const o = off.getContext('2d')!;
-    const k = ({ meetfolio: [0.72, 0.56, 0.4, 0.52], abtrace: [0.8, 0.62, 0.42, 0.53], 'document-ai': [0.86, 0.66, 0.47, 0.55] } as Record<string, number[]>)[id] ?? [0.7, 0.58, 0.4, 0.52];
-    const crop = k[0], sx = icon.width * (1 - crop) / 2, sy = icon.height * (1 - crop) / 2;
-    const size = S * k[1], dx = (S - size) / 2, dy = S * 0.05;
-    o.drawImage(icon, sx, sy, icon.width * crop, icon.height * crop, dx, dy, size, size);
+    const crop = icon.width * f.crop;
+    const from = (icon.width - crop) / 2;
+    const mark = size * f.mark;
+    const x = (size - mark) / 2;
+    const y = size * 0.15;
+    o.drawImage(icon, from, from, crop, crop, x, y, mark, mark);
     o.globalCompositeOperation = 'destination-in';
-    const m = o.createRadialGradient(S / 2, dy + size / 2, size * k[2], S / 2, dy + size / 2, size * k[3]);
-    m.addColorStop(0, 'rgba(0,0,0,1)');
-    m.addColorStop(1, 'rgba(0,0,0,0)');
-    o.fillStyle = m;
-    o.fillRect(0, 0, S, S);
+    const feather = o.createRadialGradient(size / 2, y + mark / 2, mark * 0.44, size / 2, y + mark / 2, mark * 0.6);
+    feather.addColorStop(0, 'rgba(0,0,0,1)');
+    feather.addColorStop(1, 'rgba(0,0,0,0)');
+    o.fillStyle = feather;
+    o.fillRect(0, 0, size, size);
+    // Marks on a dark tile are screened on, so the tile melts into the cushion.
+    c.globalCompositeOperation = id === 'abtrace' ? 'screen' : 'source-over';
     c.drawImage(off, 0, 0);
+    c.globalCompositeOperation = 'source-over';
   }
-
   if (f.name) {
     c.fillStyle = f.ink;
     c.textAlign = 'center';
     c.textBaseline = 'middle';
-    c.font = `700 ${Math.round(S * 0.15)}px "Cahuenga", "Source Serif 4", Georgia, serif`;
-    c.shadowColor = f.ink === '#ffffff' ? 'rgba(0,0,0,0.22)' : 'rgba(255,255,255,0.4)';
-    c.shadowBlur = S * 0.01;
-    c.shadowOffsetY = S * 0.006;
-    c.fillText(f.name, S / 2, S * 0.8, S * 0.84);
+    c.font = `400 ${Math.round(size * 0.112)}px "Cherry Cream Soda", Georgia, serif`;
+    c.fillText(f.name, size / 2, size * 0.75, size * 0.66);
   }
-  // Wet, glossy top: soft highlight from the upper-left sun.
-  c.shadowColor = 'transparent';
-  const gl = c.createLinearGradient(0, 0, S * 0.7, S * 0.9);
-  gl.addColorStop(0, 'rgba(255,255,255,0.20)');
-  gl.addColorStop(0.45, 'rgba(255,255,255,0.0)');
-  c.fillStyle = gl;
-  c.fillRect(0, 0, S, S);
-  c.restore();
 }
 
-/**
- * App-icon cushion float: a soft, puffy rounded body in the brand colour with
- * the mark and the project name printed on top. The lower part sits below the
- * waterline; the water shader draws it refracted and tinted (submergedBodies).
- */
-function brandFloat(id: BrandId, isRound = false): BuiltObject {
-  const group = new THREE.Group();
-  const diameter = isRound ? 0.6 : 0.42;
-  const radius = diameter * 0.5;
-  const f = FACE[id];
-  const body = clay(f.body, 0.32, { clearcoat: 0.85, clearcoatRoughness: 0.12, sheen: 0.2 });
-  if (isRound) {
-    group.add(mesh(track(new THREE.CylinderGeometry(radius, radius, 0.13, 96)), body, 0, 0.0, 0));
-    const torus = mesh(track(new THREE.TorusGeometry(radius - 0.03, 0.032, 18, 96)), body, 0, 0.064, 0);
-    torus.rotation.x = -Math.PI / 2;
-    group.add(torus);
-    group.add(mesh(track(new THREE.CylinderGeometry(radius - 0.03, radius - 0.03, 0.03, 96)), body, 0, 0.068, 0));
-  } else {
-    // Puffy cushion: a very rounded box plus a slightly domed top pad.
-    group.add(mesh(rbox(diameter, 0.135, diameter, 0.07, 8), body, 0, 0.0, 0));
-    group.add(mesh(rbox(diameter * 0.94, 0.04, diameter * 0.94, 0.06, 6), body, 0, 0.058, 0));
+/** A plump, rounded-square cushion (or disc), flat-topped and printed from above. */
+function cushionGeometry(round: boolean) {
+  const geo = sculptedSphere([96, 64], (v) => {
+    const y = signedPow(v.y, 0.62);
+    if (round) {
+      const r = Math.hypot(v.x, v.z) || 1;
+      const k = signedPow(r, 0.42) / r;
+      v.set(v.x * k, y, v.z * k);
+    } else {
+      v.set(signedPow(v.x, 0.42), y, signedPow(v.z, 0.42));
+    }
+  });
+  const p = geo.getAttribute('position') as THREE.BufferAttribute;
+  const uv = new Float32Array(p.count * 2);
+  for (let i = 0; i < p.count; i++) {
+    uv[i * 2] = (p.getX(i) + 1) / 2;
+    uv[i * 2 + 1] = (1 - p.getZ(i)) / 2;
   }
-  const S = 512;
-  const canvas = document.createElement('canvas');
-  canvas.width = canvas.height = S;
-  const tex = track(new THREE.CanvasTexture(canvas));
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.anisotropy = 12;
+  geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+  return geo;
+}
+
+function brandFloat(id: BrandId): BuiltObject {
+  const round = id === 'adapt-to-china';
+  const half = round ? 0.235 : 0.148;
+  const height = round ? 0.13 : 0.15;
+  const { canvas, texture, c } = canvasTexture(512, 512);
   let icon: HTMLImageElement | null = null;
   const repaint = () => {
-    paintFace(id, canvas, icon, isRound);
-    tex.needsUpdate = true;
+    if (!c) return;
+    paintFace(id, c, canvas.width, icon);
+    texture.needsUpdate = true;
   };
   repaint();
-  if (id !== 'fanscope') {
-    const img = new Image();
-    img.decoding = 'async';
-    img.onload = () => {
-      icon = img;
-      repaint();
-    };
-    img.src = `/assets/icons/${id}.png`;
-  }
+  const img = new Image();
+  img.decoding = 'async';
+  img.onload = () => {
+    icon = img;
+    repaint();
+  };
+  img.src = `/assets/icons/${id}.png`;
   fontsReady().then(repaint);
-  const faceMat = track(new THREE.MeshBasicMaterial({ map: tex, transparent: true, alphaTest: 0.04, toneMapped: false }));
-  const face = isRound
-    ? track(new THREE.CircleGeometry(radius - 0.045, 96)).rotateX(-Math.PI / 2)
-    : track(new THREE.PlaneGeometry(diameter * 0.9, diameter * 0.9)).rotateX(-Math.PI / 2);
-  const faceMesh = mesh(face, faceMat, 0, isRound ? 0.0845 : 0.0795, 0);
-  faceMesh.renderOrder = 1;
-  group.add(faceMesh);
-  return { group, hx: radius, hz: radius, top: 0.09, shape: isRound ? 1 : 0 };
+
+  const body = mesh(
+    shared(round ? 'cushion-round' : 'cushion-square', () => cushionGeometry(round)),
+    vinyl('#ffffff', 0.5, { map: texture, clearcoat: 0.5, clearcoatRoughness: 0.24, envMapIntensity: 0.3 }),
+    0,
+    height * 0.14,
+    0,
+  );
+  body.scale.set(half, height / 2, half);
+  const group = new THREE.Group();
+  group.add(body);
+  return { group, radius: half + 0.012, top: height * 0.64, mass: round ? 1.7 : 1.1, maxTilt: round ? 0.11 : 0.17 };
+}
+
+/* ------------------------------------------------------------- */
+/* About — the folded paper boat                                    */
+/* ------------------------------------------------------------- */
+function paperBoat(): BuiltObject {
+  const boat = new THREE.Group();
+  const sheet = matte('#ffffff', 0.78);
+  sheet.side = THREE.DoubleSide;
+  sheet.flatShading = true;
+  const shade = matte('#dfe8ea', 0.84);
+  shade.side = THREE.DoubleSide;
+  shade.flatShading = true;
+  const L = 0.235; // bow and stern
+  const K = 0.115; // keel half length
+  const B = 0.088; // half beam at the gunwale
+  const H = 0.082; // gunwale height
+  const D = -0.03; // keel depth
+  const mid = 0.085; // where the gunwale reaches full beam
+  const tris = (points: number[], mat: THREE.Material, uvs?: number[]) => {
+    const g = track(new THREE.BufferGeometry());
+    g.setAttribute('position', new THREE.Float32BufferAttribute(points, 3));
+    if (uvs) g.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+    g.computeVertexNormals();
+    boat.add(new THREE.Mesh(g, mat));
+  };
+
+  // The camera-side hull carries the name, as a printed paper boat would.
+  const { canvas, texture, c } = canvasTexture(1024, 256);
+  const paintHull = () => {
+    if (!c) return;
+    c.fillStyle = '#fdfdfa';
+    c.fillRect(0, 0, canvas.width, canvas.height);
+    c.fillStyle = '#1d3a5f';
+    c.textAlign = 'center';
+    c.textBaseline = 'middle';
+    c.font = '400 92px "Cherry Cream Soda", Georgia, serif';
+    c.fillText('About Martin', 512, 128, 640);
+    texture.needsUpdate = true;
+  };
+  paintHull();
+  fontsReady().then(paintHull);
+  const printed = track(new THREE.MeshStandardMaterial({ map: texture, roughness: 0.78, side: THREE.DoubleSide }));
+
+  for (const s of [1, -1]) {
+    const hull = [
+      [-L, H, 0], [-K, D, 0], [-mid, H, s * B],
+      [-mid, H, s * B], [-K, D, 0], [K, D, 0],
+      [-mid, H, s * B], [K, D, 0], [mid, H, s * B],
+      [mid, H, s * B], [K, D, 0], [L, H, 0],
+    ];
+    const uvs = hull.flatMap(([x, y]) => [(x + L) / (2 * L), (y - D) / (H - D)]);
+    tris(hull.flat(), s > 0 ? printed : shade, uvs);
+    // Inside of the fold, seen from above.
+    tris([
+      -L, H, 0, -mid, H, s * B, 0, H * 0.2, 0,
+      -mid, H, s * B, mid, H, s * B, 0, H * 0.2, 0,
+      mid, H, s * B, L, H, 0, 0, H * 0.2, 0,
+    ], shade);
+    // The two faces of the central peak.
+    tris([-0.11, H * 0.6, s * 0.02, 0.11, H * 0.6, s * 0.02, 0, H + 0.17, 0], s > 0 ? sheet : shade);
+  }
+  // Heeled away from the camera, which lifts the printed side into view.
+  boat.rotation.x = -0.62;
+  boat.position.y = 0.036;
+  const group = new THREE.Group();
+  group.add(boat);
+  return {
+    group,
+    radius: 0.17,
+    top: 0.24,
+    mass: 0.7,
+    maxTilt: 0.14,
+    animate(time) {
+      boat.rotation.z = Math.sin(time * 1.1) * 0.04;
+    },
+  };
+}
+
+/* ------------------------------------------------------------- */
+/* Life — a striped swim ring                                       */
+/* ------------------------------------------------------------- */
+function swimRing(): BuiltObject {
+  const { canvas, texture, c } = canvasTexture(1024, 256);
+  texture.wrapS = THREE.RepeatWrapping;
+  const paint = () => {
+    if (!c) return;
+    const segments = 8;
+    const w = canvas.width / segments;
+    for (let i = 0; i < segments; i++) {
+      c.fillStyle = i % 2 ? '#fff8ee' : '#f2553d';
+      c.fillRect(i * w, 0, w + 1, canvas.height);
+    }
+    // Printed across the top of the tube, on the white segments only.
+    c.fillStyle = '#c93a24';
+    c.textAlign = 'center';
+    c.textBaseline = 'middle';
+    c.font = '400 58px "Cherry Cream Soda", Georgia, serif';
+    c.save();
+    c.translate(1.5 * w, canvas.height * 0.25);
+    c.rotate(Math.PI);
+    c.fillText('Life', 0, 0);
+    c.restore();
+    texture.needsUpdate = true;
+  };
+  paint();
+  fontsReady().then(paint);
+  const R = 0.122;
+  const r = 0.056;
+  const tube = mesh(track(new THREE.TorusGeometry(R, r, 28, 96)), vinyl('#ffffff', 0.24, { map: texture, clearcoat: 1, clearcoatRoughness: 0.12 }), 0, 0.016, 0);
+  tube.rotation.x = Math.PI / 2;
+  const valve = mesh(track(new THREE.CapsuleGeometry(0.008, 0.014, 4, 8)), matte('#f2d9c9', 0.4), R * 0.72, 0.07, R * 0.72);
+  const group = new THREE.Group();
+  group.add(tube, valve);
+  return { group, radius: R + r, top: 0.08, mass: 0.9, maxTilt: 0.18 };
+}
+
+/* ------------------------------------------------------------- */
+/* Rubber ducks                                                     */
+/* ------------------------------------------------------------- */
+type Accessory = 'sunglasses' | 'snorkel' | 'sunhat';
+
+const accessoryBuilders: Record<Accessory, (head: THREE.Group) => void> = {
+  sunglasses(head) {
+    const frame = matte('#14171c', 0.26, 0.2);
+    const rim = shared('shade-rim', () => new THREE.TorusGeometry(0.17, 0.03, 8, 26));
+    const disc = shared('shade-lens', () => new THREE.CircleGeometry(0.165, 24));
+    const lens = vinyl('#1b2430', 0.1);
+    for (const side of [1, -1]) {
+      const eye = new THREE.Group();
+      eye.position.set(side * 0.215, 0.16, 0.47);
+      eye.rotation.set(-0.3, side * 0.42, 0);
+      eye.add(new THREE.Mesh(rim, frame), new THREE.Mesh(disc, lens));
+      head.add(eye);
+    }
+    const bridge = mesh(shared('shade-bridge', () => new THREE.CapsuleGeometry(0.024, 0.1, 4, 8)), frame, 0, 0.2, 0.53);
+    bridge.rotation.z = Math.PI / 2;
+    head.add(bridge);
+  },
+  snorkel(head) {
+    const mask = vinyl('#1f9a96', 0.3);
+    const visor = mesh(shared('mask-visor', () => new THREE.SphereGeometry(0.34, 20, 14)), vinyl('#a9e9f2', 0.06, { clearcoat: 1 }), 0, 0.17, 0.36);
+    visor.scale.set(1.15, 0.62, 0.62);
+    const skirt = mesh(shared('mask-skirt', () => new THREE.SphereGeometry(0.39, 20, 14)), mask, 0, 0.16, 0.32);
+    skirt.scale.set(1.16, 0.68, 0.56);
+    const strap = mesh(shared('mask-strap', () => new THREE.TorusGeometry(0.53, 0.035, 8, 40)), mask, 0, 0.1, 0);
+    strap.rotation.x = Math.PI / 2 - 0.1;
+    const tube = mesh(
+      shared('snorkel-tube', () =>
+        new THREE.TubeGeometry(
+          new THREE.CatmullRomCurve3([new THREE.Vector3(0.5, -0.12, 0.28), new THREE.Vector3(0.66, 0.1, 0.12), new THREE.Vector3(0.68, 0.48, -0.08), new THREE.Vector3(0.66, 0.82, -0.14)]),
+          22, 0.05, 8,
+        ),
+      ),
+      vinyl('#ff8a4c', 0.3),
+    );
+    head.add(skirt, visor, strap, tube);
+  },
+  sunhat(head) {
+    const straw = matte('#f0d9a6', 0.72);
+    const brim = mesh(shared('hat-brim', () => new THREE.CylinderGeometry(0.78, 0.86, 0.035, 40)), straw, 0, 0.42, -0.04);
+    const crown = mesh(shared('hat-crown', () => new THREE.SphereGeometry(0.42, 24, 14, 0, Math.PI * 2, 0, Math.PI / 2)), straw, 0, 0.42, -0.04);
+    crown.scale.y = 0.82;
+    const band = mesh(shared('hat-band', () => new THREE.CylinderGeometry(0.425, 0.43, 0.09, 32, 1, true)), matte('#d84a33', 0.5), 0, 0.47, -0.05);
+    // Pushed back off the face, the way a hat sits on someone looking up.
+    const hat = new THREE.Group();
+    hat.rotation.x = -0.5;
+    hat.position.set(0, -0.08, -0.12);
+    hat.add(brim, crown, band);
+    head.add(hat);
+  },
+};
+
+/** Built around a 2-unit-long body; the caller scales it. Faces +z. */
+function rubberDuck(accessory?: Accessory): BuiltObject {
+  const duck = new THREE.Group();
+  const rubber = vinyl('#ffcb2e', 0.27, { clearcoat: 0.9, clearcoatRoughness: 0.14, sheen: 0.4, sheenColor: new THREE.Color('#ff9d2e') });
+  const hull = shared('duck-body', () =>
+    sculptedSphere([44, 30], (v) => {
+      // Plump, with a short upturned nub of a tail.
+      const rear = ramp(-0.5, -1, v.z);
+      v.y = v.y * 0.72 + rear * 0.34;
+      v.x *= 0.9 - rear * 0.42;
+      v.z = v.z * 0.98 - rear * 0.1;
+    }),
+  );
+  duck.add(mesh(hull, rubber, 0, 0.26, 0));
+  const neck = mesh(shared('duck-neck', () => new THREE.SphereGeometry(0.46, 20, 14)), rubber, 0, 0.72, 0.36);
+  neck.scale.set(1, 1.1, 0.95);
+  duck.add(neck);
+
+  const wing = shared('duck-wing', () =>
+    sculptedSphere([24, 16], (v) => {
+      const tip = ramp(0.1, -1, v.z);
+      v.x *= 0.14;
+      v.y *= 0.3 * (1 - tip * 0.45);
+      v.z *= 0.5;
+      v.y += tip * tip * 0.1;
+    }),
+  );
+  const wings: THREE.Mesh[] = [];
+  for (const side of [1, -1]) {
+    const w = mesh(wing, rubber, side * 0.74, 0.44, -0.12);
+    w.rotation.set(-0.16, side * 0.14, side * -0.42);
+    duck.add(w);
+    wings.push(w);
+  }
+
+  const head = new THREE.Group();
+  head.position.set(0, 1.18, 0.46);
+  head.rotation.x = -0.2;
+  head.scale.setScalar(1.08);
+  head.add(mesh(shared('duck-head', () => new THREE.SphereGeometry(0.52, 30, 22)), rubber));
+  const bill = matte('#ff8a1e', 0.34);
+  const upper = mesh(
+    shared('duck-bill', () =>
+      sculptedSphere([24, 14], (v) => {
+        const tip = ramp(0, 1, v.z);
+        v.x *= 0.3 + tip * 0.05;
+        v.y = v.y * 0.1 + tip * 0.03;
+        v.z *= 0.36;
+      }),
+    ),
+    bill, 0, -0.03, 0.54,
+  );
+  const lower = mesh(shared('duck-lower', () => new THREE.SphereGeometry(1, 16, 10)), bill, 0, -0.1, 0.46);
+  lower.scale.set(0.2, 0.05, 0.25);
+  head.add(upper, lower);
+  const pupil = matte('#101418', 0.12);
+  const glint = track(new THREE.MeshBasicMaterial({ color: '#ffffff' }));
+  for (const side of [1, -1]) {
+    head.add(mesh(shared('duck-eye', () => new THREE.SphereGeometry(0.082, 14, 10)), pupil, side * 0.25, 0.16, 0.42));
+    head.add(mesh(shared('duck-glint', () => new THREE.SphereGeometry(0.027, 8, 6)), glint, side * 0.25 - 0.02, 0.215, 0.475));
+  }
+  if (accessory) accessoryBuilders[accessory](head);
+  duck.add(head);
+
+  const scale = 0.088;
+  duck.scale.setScalar(scale);
+  const group = new THREE.Group();
+  group.add(duck);
+  const phase = Math.random() * 10;
+  return {
+    group,
+    radius: scale * 1.05,
+    top: scale * 1.7,
+    mass: 0.6,
+    maxTilt: 0.22,
+    animate(time) {
+      // Mostly still; every few seconds the duck glances about.
+      head.rotation.y = Math.sin(time * 0.31 + phase) * Math.sin(time * 0.13 + phase * 2) * 0.5;
+    },
+  };
 }
 
 export const builders: Record<PoolObjectId, () => BuiltObject> = {
-  'adapt-to-china': () => brandFloat('adapt-to-china', true),
+  'adapt-to-china': () => brandFloat('adapt-to-china'),
   meetfolio: () => brandFloat('meetfolio'),
   abtrace: () => brandFloat('abtrace'),
   'supplier-document-intelligence': () => brandFloat('document-ai'),
   fanscope: () => brandFloat('fanscope'),
   about: paperBoat,
+  life: swimRing,
 };
 
-/** Consistent, physically modest app floats around the underwater identity. */
-export const baseScale: Record<PoolObjectId, number> = {
-  'adapt-to-china': 1.0,
-  meetfolio: 1.00,
-  abtrace: 1.00,
-  'supplier-document-intelligence': 1.00,
-  fanscope: 1.00,
-  about: 1.35,
-};
+/** One per entry in `duckSlots`. */
+export const duckBuilders: (() => BuiltObject)[] = [() => rubberDuck(), () => rubberDuck('sunglasses'), () => rubberDuck('sunhat'), () => rubberDuck('snorkel')];

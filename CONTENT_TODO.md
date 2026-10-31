@@ -19,7 +19,7 @@ Updated 27 October 2026. The approved V6 design and routes remain the baseline.
 4. Supply watermark-free original medical-guide cover/inside pages, if these should appear. Fields are in `src/data/artifacts.ts`; they remain null/empty. Do not repeat “Checked against official 2026 standards” without evidence.
 5. Confirm the original channels of the two quotations if channel attribution is desired. Permission is already confirmed; it is not being requested again.
 6. Clarify the hospital “X ray section” only if more specific wording is wanted. The page currently keeps the conservative original meaning and claims no medical outcome.
-7. Group-photo permissions and specific captions, if the two disabled images should return. `publicOk: false` is intentional.
+7. Group-photo permissions: both group photos are visible on the Life page (`publicOk: true`). Confirm permission before public launch, and set `publicOk: false` on any that is not cleared.
 8. Confirm role-specific start dates; `site.lookingFor.availability` is null. The supplied internship/2027 search/2028 graduation timeline is used without inventing an availability date.
 9. Approve or replace the proposed panda metaphor in the source comment at `poolMetaphor`; it is null and hidden until approved.
 10. Check publication permission for the AbTrace name, prototype descriptions and the commercial snapshots before public launch.
@@ -27,8 +27,7 @@ Updated 27 October 2026. The approved V6 design and routes remain the baseline.
 
 ## Optional float assets
 
-V6.4 note: visual floats now use provided/derived brand icons on beveled physical 3D bodies. The old panda, rubber-duck, flask, printer and telescope textures are no longer used. Adapt to China and FanScope cases now include dated user-supplied screenshots. Document AI uses a clearly identified **reference-inspired temporary icon**, not a supplied formal brand mark. Replace it when an official mark is available. Do not regenerate unused V6.3 SDF images.
+V11 note: pool floats use the brand icons in `public/assets/icons/`, printed on modelled cushions. Rubber ducks are procedural and decorative. Older float textures in `public/assets/floats/` are no longer used at runtime. Adapt to China and FanScope cases now include dated user-supplied screenshots. Document AI uses a clearly identified **reference-inspired temporary icon**, not a supplied formal brand mark. Replace it when an official mark is available. Do not regenerate unused V6.3 SDF images.
 
 ## V8
-- Cahuenga is a commercial font (Luxtypo / MyFonts). Buy a web licence, add the woff2 files to public/fonts/ and add url() sources to the Cahuenga @font-face rules at the top of src/styles/main.css. Until then Source Serif 4 is used.
 - FanScope mobile trend screenshot shows sample counts and missingness; replace it if these figures should stay internal.

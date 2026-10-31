@@ -1,9 +1,9 @@
 Bundled license information:
 
-scheduler/cjs/scheduler.development.js:
+scheduler/cjs/scheduler.production.js:
   /**
    * @license React
-   * scheduler.development.js
+   * scheduler.production.js
    *
    * Copyright (c) Meta Platforms, Inc. and affiliates.
    *
@@ -11,10 +11,10 @@ scheduler/cjs/scheduler.development.js:
    * LICENSE file in the root directory of this source tree.
    */
 
-react/cjs/react.development.js:
+react/cjs/react.production.js:
   /**
    * @license React
-   * react.development.js
+   * react.production.js
    *
    * Copyright (c) Meta Platforms, Inc. and affiliates.
    *
@@ -22,10 +22,10 @@ react/cjs/react.development.js:
    * LICENSE file in the root directory of this source tree.
    */
 
-react-dom/cjs/react-dom.development.js:
+react-dom/cjs/react-dom.production.js:
   /**
    * @license React
-   * react-dom.development.js
+   * react-dom.production.js
    *
    * Copyright (c) Meta Platforms, Inc. and affiliates.
    *
@@ -33,10 +33,10 @@ react-dom/cjs/react-dom.development.js:
    * LICENSE file in the root directory of this source tree.
    */
 
-react-dom/cjs/react-dom-client.development.js:
+react-dom/cjs/react-dom-client.production.js:
   /**
    * @license React
-   * react-dom-client.development.js
+   * react-dom-client.production.js
    *
    * Copyright (c) Meta Platforms, Inc. and affiliates.
    *
@@ -44,10 +44,10 @@ react-dom/cjs/react-dom-client.development.js:
    * LICENSE file in the root directory of this source tree.
    */
 
-react/cjs/react-jsx-runtime.development.js:
+react/cjs/react-jsx-runtime.production.js:
   /**
    * @license React
-   * react-jsx-runtime.development.js
+   * react-jsx-runtime.production.js
    *
    * Copyright (c) Meta Platforms, Inc. and affiliates.
    *

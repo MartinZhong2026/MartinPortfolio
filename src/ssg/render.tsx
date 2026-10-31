@@ -6,7 +6,7 @@
 import { renderToStaticMarkup, renderToString } from 'react-dom/server';
 import type { ReactElement } from 'react';
 import { Document, type Assets, type PageMeta } from '../components/Layout';
-import { About, Home, NotFound, Work } from '../pages/pages';
+import { About, Home, Life, NotFound, Work } from '../pages/pages';
 import { AdaptToChina } from '../pages/cases/AdaptToChina';
 import { Meetfolio } from '../pages/cases/Meetfolio';
 import { AbTrace } from '../pages/cases/AbTrace';
@@ -78,6 +78,17 @@ export const routes: Route[] = [
     file: 'about/index.html',
     entry: 'site',
     render: () => <About />,
+  },
+  {
+    meta: {
+      path: '/life/',
+      title: 'Life — Martin Zhong',
+      bodyClass: 'about-landing page-life',
+      description: 'Running, fitness, hiking, drawing and a photo gallery: Martin Zhong outside the screen.',
+    },
+    file: 'life/index.html',
+    entry: 'site',
+    render: () => <Life />,
   },
   {
     meta: {

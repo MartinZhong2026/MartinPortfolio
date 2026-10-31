@@ -71,6 +71,8 @@ function filters() {
 }
 
 export function initSite() {
+  // Life moved out of About onto its own page.
+  if (location.pathname === '/about/' && location.hash === '#outside') location.replace('/life/');
   reveals();
   timelineProgress();
   filters();

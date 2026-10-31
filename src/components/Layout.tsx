@@ -40,7 +40,7 @@ export function Document({ meta, assets, children }: { meta: PageMeta; assets: A
         <meta name="twitter:card" content="summary_large_image" />
         <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
         {assets.preload.map((href) => (
-          <link key={href} rel="preload" href={href} as="font" type="font/woff" crossOrigin="anonymous" />
+          <link key={href} rel="preload" href={href} as="font" type={href.endsWith('.woff2') ? 'font/woff2' : 'font/woff'} crossOrigin="anonymous" />
         ))}
         <link rel="stylesheet" href={assets.css} />
         <script dangerouslySetInnerHTML={{ __html: INLINE_BOOT }} />
@@ -72,7 +72,7 @@ export function Header({ path }: { path: string }) {
         </a>
         <nav className="nav" aria-label="Primary">
           {nav.map((n) => (
-            <a key={n.href} href={n.href} aria-current={path.startsWith(n.href) ? 'page' : undefined}>
+            <a key={n.href} href={n.href} aria-current={(n.href === '/' ? path === '/' : path.startsWith(n.href)) ? 'page' : undefined}>
               {n.label}
             </a>
           ))}
@@ -95,9 +95,10 @@ export function Footer() {
       <div className="wrap site-footer__inner">
         <p style={{ margin: 0 }}>{site.footer}</p>
         <nav aria-label="Footer">
-          <a href="/">Pool</a>
-          <a href="/work/">Work</a>
+          <a href="/">Home</a>
           <a href="/about/">About</a>
+          <a href="/work/">Work</a>
+          <a href="/life/">Life</a>
           <a href="/about/#contact">Contact</a>
           {links.map((l) => (
             <a key={l.href} href={l.href} rel="noopener">

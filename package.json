@@ -15,6 +15,8 @@
     "typecheck": "tsc --noEmit",
     "test:content": "node scripts/check-content.mjs",
     "test:e2e": "node scripts/e2e.mjs",
+    "test:about": "node scripts/check-about-layout.mjs",
+    "capture": "node scripts/capture.mjs",
     "test": "npm run typecheck && npm run build && npm run test:content",
     "test:v62:source": "node scripts/check-v62-source.mjs"
   },

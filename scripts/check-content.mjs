@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { dist } from './lib.mjs';
 
 const slugs = ['adapt-to-china', 'meetfolio', 'abtrace', 'supplier-document-intelligence', 'fanscope'];
-const allPages = ['index.html', 'work/index.html', 'about/index.html', '404.html', ...slugs.map((s) => `work/${s}/index.html`)];
+const allPages = ['index.html', 'work/index.html', 'about/index.html', 'life/index.html', '404.html', ...slugs.map((s) => `work/${s}/index.html`)];
 for (const route of allPages) {
   const html = await readFile(join(dist, route), 'utf8');
   assert.match(html, /<html\b/i, `Missing HTML element: ${route}`);
@@ -18,6 +18,13 @@ for (const slug of slugs) {
 }
 assert(!home.toLowerCase().includes('marble3d'), 'Removed project appeared in homepage');
 assert.match(home, /Adapt to China/);
+for (const href of ['/about/', '/work/', '/life/']) assert(home.includes(`href="${href}"`), `Homepage is missing a link to ${href}`);
+// The homepage stays the pool: its old stacked sections live on their own pages.
+for (const text of ['YBBE TECH', 'First Prize Scholarship', 'about-v6__gallery', 'card__summary']) assert(!home.includes(text), `Homepage should not contain: ${text}`);
+for (const [font, license] of [['piedra.woff2', 'Piedra-OFL.txt'], ['cherry-cream-soda.woff2', 'CherryCreamSoda-Apache-2.0.txt'], ['geo.woff2', 'Geo-OFL.txt'], ['special-elite.woff2', 'SpecialElite-Apache-2.0.txt']]) {
+  await stat(join(dist, 'fonts', font));
+  await stat(join(dist, 'fonts/licenses', license));
+}
 const atc = await readFile(join(dist, 'work/adapt-to-china/index.html'), 'utf8');
 assert(atc.length > 3000, 'Flagship case study seems incomplete');
 await stat(join(dist, 'favicon.svg'));
@@ -63,9 +70,11 @@ for (const route of allPages) {
   }
 }
 const about = await readFile(join(dist, 'about/index.html'), 'utf8');
-assert(about.includes('shanghai-run-group') && about.includes('hiking-group'), 'Requested five-photo About gallery incomplete');
+const life = await readFile(join(dist, 'life/index.html'), 'utf8');
+for (const photo of ['salomon-city-run', 'jingan-10k', 'hong-kong-sketch', 'shanghai-run-group', 'hiking-group']) assert(life.includes(photo), `Life gallery is missing ${photo}`);
+for (const text of ['Running gives me rhythm.', 'strength training', 'Hiking takes me somewhere unfamiliar.', 'Drawing makes me pay attention.', 'Henan', 'Macau']) assert(life.includes(text), `Life copy missing: ${text}`);
 assert(about.includes('YBBE TECH') && about.includes('2028'));
-for (const html of [about, home]) {
+for (const html of [about]) {
   assert(!/Mintel|Career International|GPA|Academic Progress Award|First-Class|Second-Class/.test(html), 'Outdated About content rendered');
   for (const text of ['First Prize Scholarship', 'Second Prize Scholarship', '5,000+ Instagram views', 'founded and continue to operate', 'AI Product &amp; Software Development']) assert(html.includes(text), `Approved About copy missing: ${text}`);
   const timeline = html.match(/aria-label="Education and career timeline"[\s\S]*?<\/section>/)?.[0];
