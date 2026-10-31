@@ -29,6 +29,8 @@ export interface Anchor {
 export interface EngineOptions {
   reducedMotion: boolean;
   coarse: boolean;
+  /** diagnostic switches from `?poolfx=`; see capability.ts */
+  fx: Set<string>;
   ids: PoolObjectId[];
   onHover(id: PoolObjectId | null): void;
   onActivate(id: PoolObjectId): void;
@@ -67,11 +69,15 @@ const SUN_PORTRAIT: [number, number, number] = [-0.22, 1.0, 0.4];
 
 /** Where the call to action floats, just past "welcome to my world" on screen. */
 const CTA_LANDSCAPE = { x: 0, z: 0.6, halfX: 0.42, halfZ: 0.1 };
-const CTA_PORTRAIT = { x: 0.37, z: 0, halfX: 0.09, halfZ: 0.42 };
+const CTA_PORTRAIT = { x: 0.33, z: 0, halfX: 0.09, halfZ: 0.42 };
 
 /** Camera tilt from straight down, in radians: enough to see the far wall. */
 const TILT_LANDSCAPE = 0.54;
-const TILT_PORTRAIT = 0.36;
+const TILT_PORTRAIT = 0.26;
+
+/** Portrait: how far (world units) a float may leave its cell, so labels stay clear. */
+const CELL_FLOAT = 0.05;
+const CELL_TOY = 0.075;
 
 const { halfX: W, halfZ: L, depth: D, rimH: RIM, coping: COPING } = POOL;
 
@@ -90,7 +96,17 @@ export class PoolEngine {
   private rtA: THREE.WebGLRenderTarget;
   private rtB: THREE.WebGLRenderTarget;
   private causticRT: THREE.WebGLRenderTarget;
+  private causticRaw: THREE.WebGLRenderTarget;
   private causticScratch: THREE.WebGLRenderTarget;
+  /** seconds for the caustic map to catch up with the water */
+  private causticSettle: number;
+  private causticSeeded = false;
+  /** blur radius in map texels; the touch grid is already soft */
+  private causticSoft: number;
+  /** wave speed. Slower on touch devices, where each frame jump costs most. */
+  private windRate: number;
+  /** accumulated wave time, so the rate can change without the waves jumping */
+  private windClock = 0;
   private causticBlur: THREE.ShaderMaterial;
   private rippleTex: THREE.DataTexture;
   private causticScene = new THREE.Scene();
@@ -132,9 +148,6 @@ export class PoolEngine {
   private envRT: THREE.WebGLRenderTarget | null = null;
   private floorTypeTex: THREE.CanvasTexture;
   private leafTex: THREE.CanvasTexture;
-  /** Caustics are re-rendered every Nth frame; slow devices raise this. */
-  private causticEvery: number;
-  private frameCount = 0;
   private disposed = false;
 
   constructor(
@@ -150,8 +163,6 @@ export class PoolEngine {
     this.renderer.toneMapping = THREE.NeutralToneMapping;
     this.renderer.toneMappingExposure = 1;
     this.pixelRatio = Math.min(window.devicePixelRatio || 1, opts.coarse ? 1.5 : 2);
-    // Light pattern moves slowly: phones can refresh it every other frame unseen.
-    this.causticEvery = opts.coarse ? 2 : 1;
     this.renderer.setPixelRatio(this.pixelRatio);
 
     // --- Simulation targets ------------------------------------------
@@ -172,11 +183,19 @@ export class PoolEngine {
     // Deliberately small: the map is blurred, and low resolution helps it stay soft.
     const cRes = opts.coarse ? 384 : 512;
     this.causticRT = new THREE.WebGLRenderTarget(cRes, Math.round((cRes * L) / W), rtOpts);
+    this.causticRaw = new THREE.WebGLRenderTarget(cRes, Math.round((cRes * L) / W), rtOpts);
     this.causticScratch = new THREE.WebGLRenderTarget(cRes, Math.round((cRes * L) / W), rtOpts);
+    this.causticSettle = opts.coarse ? 0.09 : 0.05;
+    this.causticSoft = opts.coarse ? 0.3 : 0.55;
+    this.windRate = opts.coarse ? 0.55 : 1;
     this.causticBlur = new THREE.ShaderMaterial({
       vertexShader: fullscreenVert,
       fragmentShader: blurFrag,
-      uniforms: { tex: { value: null }, direction: { value: new THREE.Vector2() } },
+      uniforms: { tex: { value: null }, direction: { value: new THREE.Vector2() }, settle: { value: 1 } },
+      transparent: true,
+      blending: THREE.CustomBlending,
+      blendSrc: THREE.SrcAlphaFactor,
+      blendDst: THREE.OneMinusSrcAlphaFactor,
       depthTest: false,
       depthWrite: false,
     });
@@ -260,6 +279,9 @@ export class PoolEngine {
       light: { value: light },
       causticTex: { value: this.causticRT.texture },
       shadowTex: { value: null },
+      // Multipliers for diagnostics: caustics, glitter, fine ripples, hull rings.
+      fx: { value: new THREE.Vector4(opts.fx.has('no-caustics') ? 0 : 1, opts.fx.has('no-glitter') ? 0 : 1, opts.fx.has('no-fine') ? 0 : 1, opts.fx.has('no-rings') ? 0 : 1) },
+      fxLeaf: { value: opts.fx.has('no-leaf') ? 0 : 1 },
     };
 
     // --- Caustics ------------------------------------------------------
@@ -277,7 +299,9 @@ export class PoolEngine {
         halfSize: this.shared.halfSize,
         depth: this.shared.depth,
         focusGain: { value: 9.5 },
+        gridStep: { value: new THREE.Vector2((2 * W) / simW, (2 * L) / simH) },
       },
+      defines: opts.coarse ? { VERTEX_AREA: 1 } : {},
       blending: THREE.AdditiveBlending,
       transparent: true,
       side: THREE.DoubleSide,
@@ -410,7 +434,35 @@ export class PoolEngine {
     this.waterMat.uniforms.haloTex.value = this.floatShadows.halo.texture;
     this.bind();
     this.resize(true);
+    // Lets a test drive the pool one exact frame at a time.
+    if (opts.fx.size) (window as unknown as { __pool: unknown }).__pool = {
+      renderer: this.renderer,
+      causticRT: this.causticRT,
+      drop: (x: number, z: number, radius: number, strength: number) => this.queueDrop(x, z, radius, strength),
+      project: (x: number, z: number) => {
+        const p = new THREE.Vector3(x, 0, z).project(this.camera);
+        return { x: (p.x * 0.5 + 0.5) * this.cw, y: (-p.y * 0.5 + 0.5) * this.ch };
+      },
+      // Every toy's place and size on screen, for overlap tests.
+      toys: () =>
+        this.objects
+          .filter((o) => !o.id)
+          .map((o) => {
+            const p = new THREE.Vector3(o.pos.x, o.holder.position.y + o.built.top * o.scale * 0.5, o.pos.y);
+            const edge = p.clone().addScaledVector(new THREE.Vector3(1, 0, 0).applyQuaternion(this.camera.quaternion), o.built.radius * o.holder.scale.x);
+            p.project(this.camera);
+            edge.project(this.camera);
+            const x = (p.x * 0.5 + 0.5) * this.cw;
+            const y = (-p.y * 0.5 + 0.5) * this.ch;
+            return { x, y, r: Math.hypot((edge.x * 0.5 + 0.5) * this.cw - x, (-edge.y * 0.5 + 0.5) * this.ch - y) };
+          }),
+      step: (dt: number) => {
+        this.stop();
+        this.frame(this.last + dt * 1000);
+      },
+    };
     // A few opening drops so the first frame already looks like water.
+
     this.queueDrop(-0.9, 0.15, 0.16, 0.024);
     this.queueDrop(0.46, -0.55, 0.08, -0.032);
     this.queueDrop(1.02, 0.36, 0.07, 0.028);
@@ -669,7 +721,8 @@ export class PoolEngine {
         o.scale = slot.size;
       }
     }
-    if (!this.running) this.renderOnce();
+    // Resizing clears the canvas, so always redraw before the browser paints.
+    this.renderOnce();
   }
 
   private lastFrame: { x: number; y: number; w: number; h: number } | null = null;
@@ -719,6 +772,7 @@ export class PoolEngine {
     const dt = still ? 0 : Math.min(0.05, Math.max(0, (now - this.last) / 1000));
     this.last = now;
     this.time += dt;
+    this.windClock += dt * this.windRate;
     const rm = this.opts.reducedMotion;
 
     // Parallax easing
@@ -751,28 +805,35 @@ export class PoolEngine {
       for (let i = 0; i < steps; i++) this.pass(this.updateMat);
     }
     // Reduced motion freezes the wind rather than flattening the water.
-    this.normalMat.uniforms.windTime.value = rm ? 0 : this.time;
+    this.normalMat.uniforms.windTime.value = rm ? 0 : this.windClock;
     this.pass(this.normalMat);
 
     // --- Caustics
-    if (this.frameCount++ % this.causticEvery === 0 || still) {
-      this.causticMat.uniforms.water.value = this.rtA.texture;
-      r.setRenderTarget(this.causticRT);
-      r.setClearColor(0x000000, 1);
-      r.clear();
-      r.render(this.causticScene, this.simCam);
-      // Soften it in two passes, sharing the fullscreen quad with the simulation.
-      const u = this.causticBlur.uniforms;
-      this.simQuad.material = this.causticBlur;
-      u.tex.value = this.causticRT.texture;
-      u.direction.value.set(0.55 / this.causticRT.width, 0);
-      r.setRenderTarget(this.causticScratch);
-      r.render(this.simScene, this.simCam);
-      u.tex.value = this.causticScratch.texture;
-      u.direction.value.set(0, 0.55 / this.causticRT.height);
-      r.setRenderTarget(this.causticRT);
-      r.render(this.simScene, this.simCam);
-    }
+    const u = this.causticBlur.uniforms;
+    this.causticMat.uniforms.water.value = this.rtA.texture;
+    r.setRenderTarget(this.causticRaw);
+    r.setClearColor(0x000000, 1);
+    r.clear();
+    r.render(this.causticScene, this.simCam);
+    // Soften it in two passes, sharing the fullscreen quad with the simulation.
+    this.simQuad.material = this.causticBlur;
+    u.settle.value = 1;
+    u.tex.value = this.causticRaw.texture;
+    u.direction.value.set(this.causticSoft / this.causticRaw.width, 0);
+    r.setRenderTarget(this.causticScratch);
+    r.render(this.simScene, this.simCam);
+    // Focus lines move several of their own widths between frames. Shown as they
+    // are, each line jumps, and a long thin jump reads as a flash. So the visible
+    // map eases towards the latest one over a fixed time, at any frame rate.
+    u.settle.value = this.causticSeeded && dt > 0 ? 1 - Math.exp(-dt / this.causticSettle) : 1;
+    this.causticSeeded = true;
+    u.tex.value = this.causticScratch.texture;
+    u.direction.value.set(0, this.causticSoft / this.causticRT.height);
+    r.setRenderTarget(this.causticRT);
+    const autoClear = r.autoClear;
+    r.autoClear = false;
+    r.render(this.simScene, this.simCam);
+    r.autoClear = autoClear;
 
     // --- Main view
     this.floatShadows.render();
@@ -811,8 +872,9 @@ export class PoolEngine {
       const decor = !o.id;
       const k = rm ? 4.0 : decor ? 0.5 : 1.15;
       const c = rm ? 3.0 : decor ? 0.9 : 1.35;
-      const homeX = o.home.x + (decor && !rm ? Math.sin(this.time * 0.13 + o.phase) * 0.2 : 0);
-      const homeZ = o.home.y + (decor && !rm ? Math.cos(this.time * 0.1 + o.phase * 1.7) * 0.05 : 0);
+      const roam = this.portrait ? 0.3 : 1;
+      const homeX = o.home.x + (decor && !rm ? Math.sin(this.time * 0.13 + o.phase) * 0.2 * roam : 0);
+      const homeZ = o.home.y + (decor && !rm ? Math.cos(this.time * 0.1 + o.phase * 1.7) * 0.05 * roam : 0);
       o.vel.x += ((homeX - o.pos.x) * k - o.vel.x * c) * dt;
       o.vel.y += ((homeZ - o.pos.y) * k - o.vel.y * c) * dt;
       o.vel.clampLength(0, 0.85);
@@ -830,7 +892,7 @@ export class PoolEngine {
       // Buoyancy: the float is sprung to the swell it is sitting on, with a
       // little lag and overshoot that grow with its mass.
       const t = this.time;
-      const swell = rm ? null : swellAt(o.pos.x, o.pos.y, t);
+      const swell = rm ? null : swellAt(o.pos.x, o.pos.y, this.windClock);
       const mass = o.built.mass;
       o.liftVel += (((swell?.height ?? 0) * 2.6 - o.lift) * (46 / mass) - o.liftVel * (7 / mass)) * dt;
       o.lift += o.liftVel * dt;
@@ -882,11 +944,13 @@ export class PoolEngine {
         if (dist >= required) continue;
         const nx = dist > 1e-5 ? dx / dist : 1;
         const nz = dist > 1e-5 ? dz / dist : 0;
-        const correction = (required - dist) * 0.5;
-        a.pos.x -= nx * correction;
-        a.pos.y -= nz * correction;
-        b.pos.x += nx * correction;
-        b.pos.y += nz * correction;
+        // In portrait a toy gives way entirely: it never shoves a project float.
+        const shareA = this.portrait && a.id && !b.id ? 0 : this.portrait && b.id && !a.id ? 1 : 0.5;
+        const overlap = required - dist;
+        a.pos.x -= nx * overlap * shareA;
+        a.pos.y -= nz * overlap * shareA;
+        b.pos.x += nx * overlap * (1 - shareA);
+        b.pos.y += nz * overlap * (1 - shareA);
         const closing = (a.vel.x - b.vel.x) * nx + (a.vel.y - b.vel.y) * nz;
         if (closing > 0) {
           const bounce = closing * 0.47;
@@ -923,6 +987,17 @@ export class PoolEngine {
       if (Math.abs(o.pos.y) > edgeZ) {
         o.pos.y = Math.sign(o.pos.y) * edgeZ;
         o.vel.y *= -0.26;
+      }
+      if (this.portrait) {
+        const cell = o.id ? CELL_FLOAT : CELL_TOY;
+        const offX = o.pos.x - o.home.x;
+        const offZ = o.pos.y - o.home.y;
+        const off = Math.hypot(offX, offZ);
+        if (off > cell) {
+          o.pos.x = o.home.x + (offX / off) * cell;
+          o.pos.y = o.home.y + (offZ / off) * cell;
+          o.vel.multiplyScalar(0.4);
+        }
       }
       // Deliberately allow toys on either side: the headline is now painted
       // on the pool floor and can be refracted beneath the water.
@@ -965,8 +1040,13 @@ export class PoolEngine {
       this.pixelRatio = 1;
       this.renderer.setPixelRatio(1);
       this.renderer.setSize(this.cw, this.ch, false);
-    } else if (this.causticEvery < 2) {
-      this.causticEvery = 2;
+      this.renderOnce(); // resizing clears the canvas: never show that blank frame
+    } else if (this.causticSettle < 0.15) {
+      // Never refresh the light less often: that is what makes it flash. A slow
+      // device takes bigger steps, so the light moves slower and softer instead.
+      this.causticSettle = 0.16;
+      this.causticSoft = 0.55;
+      this.windRate = Math.min(this.windRate, 0.34);
     } else {
       this.frameTimes.length = 201; // nothing left to give up
     }
@@ -1003,6 +1083,7 @@ export class PoolEngine {
     this.rtA.dispose();
     this.rtB.dispose();
     this.causticRT.dispose();
+    this.causticRaw.dispose();
     this.causticScratch.dispose();
     this.causticBlur.dispose();
     this.rippleTex.dispose();

@@ -18,3 +18,11 @@ export function placeLabel(x: number, y: number, r: number, w: number, h: number
   }
   placed.push(best!); return best!;
 }
+
+/** Portrait: a label is pinned to one side of its float, and kept inside the water. */
+export function pinLabel(side: 'below' | 'left' | 'right', x: number, y: number, r: number, w: number, h: number, width: number) {
+  const reach = r * 0.92 + 4;
+  const px = side === 'below' ? x - w / 2 : side === 'right' ? x + reach : x - reach - w;
+  const py = side === 'below' ? y + reach : y - h / 2;
+  return { x: Math.max(6, Math.min(width - w - 6, px)), y: py };
+}

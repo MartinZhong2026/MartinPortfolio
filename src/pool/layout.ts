@@ -15,6 +15,8 @@ export interface Slot {
   yaw: number;
   /** relative size multiplier */
   size: number;
+  /** portrait only: the side of the float its label is pinned to */
+  label?: 'below' | 'left' | 'right';
 }
 
 export const landscapeLayout: Record<PoolObjectId, Slot> = {
@@ -27,25 +29,26 @@ export const landscapeLayout: Record<PoolObjectId, Slot> = {
   life: { sx: -0.86, sy: 0.76, yaw: 0, size: 1.0 },
 };
 
-// At small screens keep all seven objects around a central open stripe for the
-// underwater name.
+// Portrait is a fixed composition, because a narrow pool has no room to spare:
+// every project owns a cell with its label pinned to one side, floats stay in
+// their cells, and toys keep to the gaps. Nothing here can drift into a label.
 export const portraitLayout: Record<PoolObjectId, Slot> = {
-  meetfolio: { sx: -0.5, sy: -0.68, yaw: -0.16, size: 1.06 },
-  abtrace: { sx: 0.48, sy: -0.7, yaw: 0.16, size: 1.06 },
-  fanscope: { sx: 0.6, sy: 0.53, yaw: 0.12, size: 1.0 },
-  'adapt-to-china': { sx: 0.34, sy: 0.86, yaw: 0.08, size: 0.88 },
-  'supplier-document-intelligence': { sx: -0.56, sy: 0.86, yaw: -0.1, size: 1.0 },
-  about: { sx: -0.6, sy: -0.34, yaw: 0.16, size: 1.0 },
-  life: { sx: -0.66, sy: 0.5, yaw: 0, size: 0.92 },
+  meetfolio: { sx: -0.52, sy: -0.84, yaw: -0.16, size: 1.0, label: 'below' },
+  abtrace: { sx: 0.52, sy: -0.84, yaw: 0.16, size: 1.0, label: 'below' },
+  about: { sx: -0.64, sy: -0.38, yaw: 0.16, size: 0.9, label: 'right' },
+  life: { sx: -0.72, sy: 0.54, yaw: 0, size: 0.8, label: 'right' },
+  fanscope: { sx: 0.7, sy: 0.5, yaw: 0.12, size: 0.96, label: 'left' },
+  'supplier-document-intelligence': { sx: -0.56, sy: 0.84, yaw: -0.1, size: 0.96, label: 'below' },
+  'adapt-to-china': { sx: 0.52, sy: 0.84, yaw: 0.08, size: 0.8, label: 'below' },
 };
 
 /** Decorative toys: no links, just company. They wander around these. */
 export const toySlots: { landscape: Slot; portrait: Slot }[] = [
-  { landscape: { sx: -0.8, sy: -0.7, yaw: 0.9, size: 1 }, portrait: { sx: 0.02, sy: -0.86, yaw: 0.9, size: 1.1 } },
-  { landscape: { sx: 0.0, sy: -0.72, yaw: -0.5, size: 1 }, portrait: { sx: 0.8, sy: -0.14, yaw: -0.5, size: 1.15 } },
-  { landscape: { sx: 0.24, sy: 0.98, yaw: 2.5, size: 1 }, portrait: { sx: -0.1, sy: 0.66, yaw: 2.5, size: 1.05 } },
-  { landscape: { sx: 0.84, sy: -0.66, yaw: 1.8, size: 1 }, portrait: { sx: 0.14, sy: -0.56, yaw: 1.8, size: 1.1 } },
-  { landscape: { sx: 0.88, sy: 0.5, yaw: -2.2, size: 1 }, portrait: { sx: 0.84, sy: 0.74, yaw: 1.2, size: 0.92 } },
+  { landscape: { sx: -0.8, sy: -0.7, yaw: 0.9, size: 1 }, portrait: { sx: 0.0, sy: -0.94, yaw: 0.9, size: 0.9 } },
+  { landscape: { sx: 0.0, sy: -0.72, yaw: -0.5, size: 1 }, portrait: { sx: 0.84, sy: -0.36, yaw: -0.5, size: 0.9 } },
+  { landscape: { sx: 0.24, sy: 0.98, yaw: 2.5, size: 1 }, portrait: { sx: 0.0, sy: 0.74, yaw: 2.5, size: 0.9 } },
+  { landscape: { sx: 0.84, sy: -0.66, yaw: 1.8, size: 1 }, portrait: { sx: 0.34, sy: -0.4, yaw: 1.8, size: 0.85 } },
+  { landscape: { sx: 0.88, sy: 0.5, yaw: -2.2, size: 1 }, portrait: { sx: 0.86, sy: 0.2, yaw: 1.2, size: 0.8 } },
 ];
 
 export const POOL = {

@@ -21,6 +21,16 @@ export function detectPoolSupport(): PoolSupport {
   }
 }
 
+/**
+ * Diagnostic switches for testing on a real device, e.g. `/?poolfx=no-caustics`.
+ * Each one turns a single effect off, so a visual fault can be pinned on it.
+ */
+export const poolFx = (): Set<string> => {
+  if (typeof window === 'undefined') return new Set();
+  const value = new URLSearchParams(window.location.search).get('poolfx');
+  return new Set(value ? value.split(',') : []);
+};
+
 export const prefersReducedMotion = () =>
   typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 

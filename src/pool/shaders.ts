@@ -168,12 +168,13 @@ export const blurFrag = /* glsl */ `
 precision highp float;
 uniform sampler2D tex;
 uniform vec2 direction;
+uniform float settle; // share of this result that replaces what is already there
 varying vec2 vUv;
 void main() {
   vec4 c = texture2D(tex, vUv) * 0.227027;
   c += (texture2D(tex, vUv + direction * 1.384615) + texture2D(tex, vUv - direction * 1.384615)) * 0.316216;
   c += (texture2D(tex, vUv + direction * 3.230769) + texture2D(tex, vUv - direction * 3.230769)) * 0.070270;
-  gl_FragColor = c;
+  gl_FragColor = vec4(c.rgb, settle);
 }
 `;
 
@@ -220,6 +221,8 @@ uniform sampler2D causticTex;
 uniform sampler2D shadowTex;
 uniform sampler2D floorTypeTex;
 uniform sampler2D leafTex;
+uniform vec4 fx;
+uniform float fxLeaf;
 uniform float portraitMode;
 uniform float poolTime;
 
@@ -256,8 +259,10 @@ vec3 floorTiles(vec2 p) {
   float lw = 0.05;
   // Portrait opens the lanes out so the name sits between them.
   float zl = portraitMode > 0.5 ? 0.86 : 0.66, xl = 1.26;
-  float hLine = step(abs(abs(p.y) - zl), lw) * step(abs(p.x), xl + 0.16);
-  float vLine = step(abs(abs(p.x) - xl), lw) * step(abs(p.y), zl + 0.16);
+  // Soft edges: seen through moving water, a hard one flips whole rows of pixels.
+  vec2 aa = max(fwidth(p) * 1.5, vec2(0.009));
+  float hLine = (1.0 - smoothstep(lw - aa.y, lw + aa.y, abs(abs(p.y) - zl))) * (1.0 - smoothstep(xl + 0.16 - aa.x, xl + 0.16 + aa.x, abs(p.x)));
+  float vLine = (1.0 - smoothstep(lw - aa.x, lw + aa.x, abs(abs(p.x) - xl))) * (1.0 - smoothstep(zl + 0.16 - aa.y, zl + 0.16 + aa.y, abs(p.y)));
   float lane = max(hLine, vLine);
   tile = mix(tile, vec3(0.10, 0.34, 0.66) * (0.97 + 0.06 * v), lane * 0.84);
   // UV for the identity on the tiled floor, not above the water. Portrait
@@ -338,8 +343,9 @@ vec3 poolSurface(vec3 p, bool underwater) {
   focus = max(mix(min(focus, vec3(1.0)), focus, strength), vec3(0.0));
   // Roll off the peaks like a camera does, so focus never clips to neon.
   focus = focus * 1.28 / (1.0 + 0.28 * focus);
+  focus = mix(vec3(1.0), focus, fx.x);
   float object = objectShadow(q);
-  float blocked = object * (1.0 - 0.6 * texture2D(leafTex, leafUv(q)).r);
+  float blocked = object * (1.0 - 0.6 * fxLeaf * texture2D(leafTex, leafUv(q)).r);
   if (n.y < 0.5) focus = mix(vec3(1.0), focus, 0.35) * (0.6 + 0.4 * facing);
   vec3 sun = vec3(1.0, 0.985, 0.95) * focus * blocked;
   vec3 lit = vec3(0.70, 0.75, 0.79) * mix(0.82, 1.0, object) + sun * 0.26;
@@ -357,33 +363,59 @@ uniform vec3 light;
 uniform vec2 halfSize;
 uniform float depth;
 uniform float focusGain;
+#ifdef VERTEX_AREA
+uniform vec2 gridStep; // world distance between grid vertices
+varying float gather;
+#else
 varying vec3 oldPos;
 varying vec3 newPos;
+#endif
 
 vec3 projectToFloor(vec3 origin, vec3 ray) {
   float t = (-depth - origin.y) / ray.y;
   return origin + ray * t;
 }
 
-void main() {
-  vec2 uv = position.xz / halfSize * 0.5 + 0.5;
-  vec4 info = texture2D(water, uv);
+// Where sunlight entering the water at p lands on the floor.
+vec3 landing(vec2 p) {
+  vec4 info = texture2D(water, p / halfSize * 0.5 + 0.5);
   // The pool is shallower than a real one: exaggerate the slope so the wave
   // lenses still come to a focus on the floor.
   vec2 slope = info.ba * focusGain;
   // Limit steep slopes, so a stirred pool stays soft instead of focusing into a web.
   slope /= 1.0 + dot(slope, slope) * 2.4;
   vec3 normal = normalize(vec3(slope.x, 1.0, slope.y));
+  return projectToFloor(vec3(p.x, info.r, p.y), refract(-light, normal, IOR_AIR / IOR_WATER));
+}
+
+void main() {
+  vec3 lands = landing(position.xz);
+#ifdef VERTEX_AREA
+  // How much a small patch of light shrinks on its way down. Measured here from
+  // neighbouring vertices, so the result never depends on how a GPU computes
+  // screen-space derivatives on the thin triangles along a focus line.
+  vec2 dx = vec2(gridStep.x, 0.0), dz = vec2(0.0, gridStep.y);
+  vec3 across = landing(position.xz + dx) - landing(position.xz - dx);
+  vec3 along = landing(position.xz + dz) - landing(position.xz - dz);
+  float area = abs(across.x * along.z - across.z * along.x) / (4.0 * gridStep.x * gridStep.y);
+  gather = 1.0 / max(area, 0.05);
+#else
   vec3 refractedLight = refract(-light, vec3(0.0, 1.0, 0.0), IOR_AIR / IOR_WATER);
-  vec3 ray = refract(-light, normal, IOR_AIR / IOR_WATER);
   oldPos = projectToFloor(vec3(position.x, 0.0, position.z), refractedLight);
-  newPos = projectToFloor(vec3(position.x, info.r, position.z), ray);
-  gl_Position = vec4(newPos.x / halfSize.x, newPos.z / halfSize.y, 0.0, 1.0);
+  newPos = lands;
+#endif
+  gl_Position = vec4(lands.x / halfSize.x, lands.z / halfSize.y, 0.0, 1.0);
 }
 `;
 
 export const causticsFrag = /* glsl */ `
 precision highp float;
+#ifdef VERTEX_AREA
+varying float gather;
+void main() {
+  gl_FragColor = vec4(gather * 0.25, 0.0, 0.0, 1.0);
+}
+#else
 varying vec3 oldPos;
 varying vec3 newPos;
 void main() {
@@ -391,6 +423,7 @@ void main() {
   float newArea = length(dFdx(newPos)) * length(dFdy(newPos));
   gl_FragColor = vec4(min(oldArea / max(newArea, 1e-7), 8.0) * 0.25, 0.0, 0.0, 1.0);
 }
+#endif
 `;
 
 export const waterVert = /* glsl */ `
@@ -448,7 +481,7 @@ void main() {
   // reflections and glitter, and barely touches the view of the floor.
   vec2 q = vPos.xz;
   vec2 fine = (texture2D(rippleTex, q * 0.61 + time * vec2(0.021, 0.013)).rg
-             + texture2D(rippleTex, q.yx * 1.13 - time * vec2(0.016, 0.027)).gr - 1.0) * 0.12;
+             + texture2D(rippleTex, q.yx * 1.13 - time * vec2(0.016, 0.027)).gr - 1.0) * 0.12 * fx.z;
 
   // Gentle rings spreading from each hull. A wide Gaussian falls off as
   // exp(-d^2), so sqrt(-log) recovers a distance that follows the hull's shape.
@@ -458,6 +491,7 @@ void main() {
   float reach = sqrt(max(-log(max(aura, 1e-4)), 0.0));
   float ringFade = smoothstep(0.003, 0.05, aura) * (1.0 - smoothstep(0.42, 0.8, aura));
   float swell = cos(reach * 19.0 - time * 2.1 + fine.x * 7.0);
+  ringFade *= fx.w;
   slope += auraSlope / (length(auraSlope) + 1e-4) * swell * 0.05 * ringFade;
 
   vec3 normal = normalize(vec3(slope.x + fine.x, 1.0, slope.y + fine.y));
@@ -511,7 +545,7 @@ void main() {
 
   // Sun glitter: small, scattered, and only where a facet faces the sun.
   vec3 faceted = normalize(vec3(slope.x + fine.x * 3.4, 1.0, slope.y + fine.y * 3.4));
-  float sparkle = pow(max(dot(reflect(incoming, faceted), sunDir), 0.0), 2000.0);
+  float sparkle = fx.y * pow(max(dot(reflect(incoming, faceted), sunDir), 0.0), 2000.0);
   float leaf = 1.0 - 0.8 * texture2D(leafTex, leafUv(vPos.xz)).r;
   c += vec3(1.0, 0.99, 0.95) * min(sparkle * 0.9, 0.5) * leaf * (1.0 - crease);
   c += vec3(0.88, 0.97, 0.98) * ring * 0.05;

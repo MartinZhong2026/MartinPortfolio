@@ -3624,3 +3624,27 @@ a.sc-link:focus-visible { outline: 3px solid var(--aqua); outline-offset: 4px; }
 }
 
 .sc-link--tuck { margin-top: -50%; width: 58%; z-index: 2; }
+
+/* Portrait labels are pinned, small enough to share a narrow pool. */
+@media (max-aspect-ratio: 5/6) {
+  .pool-obj__label, .pool-obj--flagship .pool-obj__label { font-size: 12px; min-height: 22px; padding: 1px 8px; }
+  .pool__status { flex: 1 1 100%; text-align: center; }
+}
+@media (max-width: 340px) {
+  .pool-obj__label, .pool-obj--flagship .pool-obj__label { font-size: 11px; min-height: 21px; padding: 1px 6px; }
+}
+
+/* Phones: the pool takes the room the deck was using, and the call to action
+   scales with it, so the composition holds from 320px up. */
+@media (max-aspect-ratio: 5/6) {
+  .pool {
+    --fw: min(calc(100vw - 14px), calc((100svh - var(--header-h) - 62px) / 1.6), 640px);
+    --fh: calc(var(--fw) * 1.6);
+    min-height: max(100svh, calc(var(--fh) + var(--header-h) + 62px));
+  }
+  .pool__bar { padding-top: 8px; }
+  .pool .pool__cta { font-size: clamp(12px, calc(var(--fw) * 0.036), 15px); padding: clamp(9px, calc(var(--fw) * 0.026), 11px) clamp(12px, calc(var(--fw) * 0.04), 16px); }
+}
+@media (max-aspect-ratio: 5/6) {
+  .pool:not(.pool--live) a[href='/life/'] .pool-obj__label { top: -11px; left: calc(var(--r) + 28px); }
+}

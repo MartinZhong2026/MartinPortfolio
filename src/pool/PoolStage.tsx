@@ -3,7 +3,7 @@ import { projects } from '../data/projects';
 import { Glyph } from '../components/Glyph';
 import { landscapeLayout, portraitLayout, type PoolObjectId } from './layout';
 import type { PoolEngine } from './PoolEngine';
-import { placeLabel, type LabelBox } from './labels';
+import { pinLabel, placeLabel, type LabelBox } from './labels';
 
 type Mode = 'static' | 'loading' | 'live' | 'unsupported';
 
@@ -51,7 +51,7 @@ export function PoolStage() {
     let cancelled = false;
     let engine: PoolEngine | null = null;
     (async () => {
-      const { detectPoolSupport, prefersReducedMotion, isCoarsePointer } = await import('./capability');
+      const { detectPoolSupport, prefersReducedMotion, isCoarsePointer, poolFx } = await import('./capability');
       const support = detectPoolSupport();
       if (!support.ok) {
         setMode('unsupported');
@@ -67,6 +67,7 @@ export function PoolStage() {
         engine = new PoolEngine(canvasRef.current, frame, {
           reducedMotion: prefersReducedMotion(),
           coarse: isCoarsePointer(),
+          fx: poolFx(),
           ids: poolItems.map((i) => i.id),
           onHover: (id) => setActive(id),
           onActivate: (id) => go(id),
@@ -80,7 +81,7 @@ export function PoolStage() {
             setMode('unsupported');
             document.documentElement.dataset.pool = 'unsupported';
           },
-          onFrame: (anchors, _portrait, cta) => {
+          onFrame: (anchors, portrait, cta) => {
             const fr = frame.getBoundingClientRect();
             const cr = canvasRef.current!.getBoundingClientRect();
             const ox = fr.left - cr.left;
@@ -113,9 +114,16 @@ export function PoolStage() {
               const label = el.querySelector<HTMLElement>('.pool-obj__label');
               if (label) {
                 const x = a.x - ox, y = a.y - oy;
-                const box = placeLabel(x, y, a.r, dimensions.get(id)!.width, dimensions.get(id)!.height, fr.width, fr.height, placed, avoided);
-                label.style.left = `${box.x + box.w / 2 - x}px`;
-                label.style.top = `${box.y - y}px`;
+                const { width, height } = dimensions.get(id)!;
+                if (portrait) {
+                  const pin = pinLabel(portraitLayout[id].label ?? 'below', x, y, a.r, width, height, fr.width);
+                  label.style.left = `${pin.x + width / 2 - x}px`;
+                  label.style.top = `${pin.y - y}px`;
+                } else {
+                  const box = placeLabel(x, y, a.r, width, height, fr.width, fr.height, placed, avoided);
+                  label.style.left = `${box.x + box.w / 2 - x}px`;
+                  label.style.top = `${box.y - y}px`;
+                }
                 const tip = el.querySelector<HTMLElement>('.pool-obj__tip');
                 if (tip) {
                   tip.style.left = `${Math.max(110, Math.min(fr.width - 110, x)) - x}px`;
