@@ -4,6 +4,9 @@ Martin Zhong's personal portfolio. The homepage is an interactive WebGL swimming
 
 Built with React (static rendering), TypeScript, esbuild and Three.js. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for how it works, [docs/MOBILE_TESTING.md](docs/MOBILE_TESTING.md) for testing on a real phone, [docs/INCIDENTS.md](docs/INCIDENTS.md) for known failures, and [AGENTS.md](AGENTS.md) for contribution rules.
 
+English keeps the existing URLs; Simplified Chinese is available under `/zh/`.
+The header's 中文 / EN switch keeps the current page and saves an explicit choice.
+
 ## Getting started
 
 Requires Node 20.10 or newer.
@@ -53,6 +56,7 @@ docs/           Architecture notes, design references, screenshots
 ## Editing content
 
 - `src/data/site.ts`: links, production origin, role preferences. A `null` link stays hidden.
+- `src/data/locales/`: reviewed Simplified Chinese copy, including the shared pool catalog. See [docs/LOCALIZATION.md](docs/LOCALIZATION.md) for bilingual authoring and QA.
 - `src/data/about.ts`: strengths, Life activities, photos, hiking regions and the About collage images.
 - `scripts/fixtures/about-story.md`: Martin's approved About essay. Edit it, then run `node scripts/gen-story.mjs` to regenerate `src/data/story.ts`.
 - `src/data/projects.ts`: the five projects and their card text.
@@ -74,7 +78,7 @@ The build generates the `_headers` (security policy, caching) and `_redirects` f
 
 ## Before launch
 
-- Set `site.origin` in `src/data/site.ts` to enable canonical URLs and the sitemap.
+- `site.origin` is `https://martin.adapttochina.com`; the Cloudflare Pages URL remains accessible, with SEO metadata pointing at the preferred origin.
 - Confirm third-party permission for the group photos on the Life page.
 - Unconfirmed account links stay hidden until supplied.
 - Work through [CONTENT_TODO.md](CONTENT_TODO.md).

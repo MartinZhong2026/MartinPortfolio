@@ -7,6 +7,7 @@ import { chromium } from 'playwright';
 import { startServer } from './serve.mjs';
 
 const has = (flag) => process.argv.includes(flag);
+const prefix = has('--zh') ? '/zh' : '';
 const args = has('--gpu') ? ['--use-angle=d3d11', '--ignore-gpu-blocklist'] : ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'];
 const sizes = [[320, 568], [320, 700], [360, 740], [375, 812], [390, 844], [412, 915], [430, 932]];
 const dprs = has('--gpu') ? [1, 2, 3] : [2];
@@ -88,7 +89,7 @@ try {
   for (const dpr of dprs) for (const [width, height] of sizes) {
     const context = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: dpr, isMobile: true, hasTouch: true });
     const page = await context.newPage();
-    await page.goto(`${origin}/?poolfx=probe`, { waitUntil: 'networkidle' });
+    await page.goto(`${origin}${prefix}/?poolfx=probe`, { waitUntil: 'networkidle' });
     await page.waitForFunction(() => document.documentElement.dataset.pool === 'live' && window.__pool, null, { timeout: 120000 });
     // Phones must never use the mesh caustic map: see docs/INCIDENTS.md.
     assert.equal(await page.evaluate(() => window.__pool.usesCausticMap), false, 'Touch devices must use analytic caustics');
@@ -102,7 +103,7 @@ try {
   {
     const context = await browser.newContext({ viewport: { width: 360, height: 740 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
     const page = await context.newPage();
-    await page.goto(`${origin}/?poolfx=probe`, { waitUntil: 'networkidle' });
+    await page.goto(`${origin}${prefix}/?poolfx=probe`, { waitUntil: 'networkidle' });
     await page.waitForFunction(() => document.documentElement.dataset.pool === 'live' && window.__pool, null, { timeout: 120000 });
     await page.waitForTimeout(600);
     const box = await page.locator('.pool__frame').boundingBox();
@@ -122,8 +123,9 @@ try {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
   const page = await context.newPage();
   const links = ['/work/adapt-to-china/', '/work/meetfolio/', '/work/abtrace/', '/work/supplier-document-intelligence/', '/work/fanscope/', '/about/', '/life/'];
-  for (const href of links) for (const part of ['float', 'label']) {
-    await page.goto(origin, { waitUntil: 'networkidle' });
+  for (const path of links) for (const part of ['float', 'label']) {
+    const href = prefix + path;
+    await page.goto(origin + prefix + '/', { waitUntil: 'networkidle' });
     await page.waitForFunction(() => document.documentElement.dataset.pool === 'live', null, { timeout: 120000 });
     await page.waitForTimeout(800);
     const p = await page.locator(`.pool__objects a[href="${href}"]`).evaluate((el, part) => {

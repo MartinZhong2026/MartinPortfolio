@@ -1,3 +1,4 @@
+import { poolText, type Locale } from '../data/localization';
 import * as THREE from 'three';
 import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type { PoolObjectId } from './layout';
@@ -74,10 +75,10 @@ const ramp = (a: number, b: number, x: number) => {
 
 const signedPow = (n: number, e: number) => Math.sign(n) * Math.pow(Math.abs(n), e);
 
-const fontsReady = (): Promise<void> => {
+const fontsReady = (locale: Locale = 'en'): Promise<void> => {
   const f = (globalThis as { document?: Document }).document?.fonts;
   if (!f) return Promise.resolve();
-  return f.load('400 40px "Cherry Cream Soda"').then(() => undefined).catch(() => undefined);
+  return Promise.all([f.load('400 40px "Cherry Cream Soda"'), ...(locale === 'zh' ? [f.load('400 40px "Noto Serif SC"')] : [])]).then(() => undefined).catch(() => undefined);
 };
 
 function canvasTexture(width: number, height: number) {
@@ -105,7 +106,7 @@ const FACES: Record<BrandId, { body: string; ink: string; name: string | null; c
 };
 
 /** Paint the cushion's top: the brand mark, feathered into its colour, and its name. */
-function paintFace(id: BrandId, c: CanvasRenderingContext2D, size: number, icon: HTMLImageElement | null) {
+function paintFace(id: BrandId, c: CanvasRenderingContext2D, size: number, icon: HTMLImageElement | null, locale: Locale) {
   const f = FACES[id];
   c.clearRect(0, 0, size, size);
   c.fillStyle = f.body;
@@ -138,8 +139,8 @@ function paintFace(id: BrandId, c: CanvasRenderingContext2D, size: number, icon:
     c.fillStyle = f.ink;
     c.textAlign = 'center';
     c.textBaseline = 'middle';
-    c.font = `400 ${Math.round(size * 0.112)}px "Cherry Cream Soda", Georgia, serif`;
-    c.fillText(f.name, size / 2, size * 0.75, size * 0.66);
+    c.font = `400 ${Math.round(size * 0.112)}px ${locale === 'zh' && id === 'document-ai' ? '"Noto Serif SC"' : '"Cherry Cream Soda"'}, Georgia, serif`;
+    c.fillText(poolText(f.name, locale), size / 2, size * 0.75, size * 0.66);
   }
 }
 
@@ -165,7 +166,7 @@ function cushionGeometry(round: boolean) {
   return geo;
 }
 
-function brandFloat(id: BrandId): BuiltObject {
+function brandFloat(id: BrandId, locale: Locale = 'en'): BuiltObject {
   const round = id === 'adapt-to-china';
   const half = round ? 0.235 : 0.148;
   const height = round ? 0.13 : 0.15;
@@ -173,7 +174,7 @@ function brandFloat(id: BrandId): BuiltObject {
   let icon: HTMLImageElement | null = null;
   const repaint = () => {
     if (!c) return;
-    paintFace(id, c, canvas.width, icon);
+    paintFace(id, c, canvas.width, icon, locale);
     texture.needsUpdate = true;
   };
   repaint();
@@ -184,7 +185,7 @@ function brandFloat(id: BrandId): BuiltObject {
     repaint();
   };
   img.src = `/assets/icons/${id}.png`;
-  fontsReady().then(repaint);
+  fontsReady(locale).then(repaint);
 
   const body = mesh(
     shared(round ? 'cushion-round' : 'cushion-square', () => cushionGeometry(round)),
@@ -202,7 +203,7 @@ function brandFloat(id: BrandId): BuiltObject {
 /* ------------------------------------------------------------- */
 /* About — the folded paper boat                                    */
 /* ------------------------------------------------------------- */
-function paperBoat(): BuiltObject {
+function paperBoat(locale: Locale = 'en'): BuiltObject {
   const boat = new THREE.Group();
   const sheet = matte('#ffffff', 0.78);
   sheet.side = THREE.DoubleSide;
@@ -233,12 +234,12 @@ function paperBoat(): BuiltObject {
     c.fillStyle = '#1d3a5f';
     c.textAlign = 'center';
     c.textBaseline = 'middle';
-    c.font = '400 92px "Cherry Cream Soda", Georgia, serif';
-    c.fillText('About Martin', 512, 128, 640);
+    c.font = locale === 'zh' ? '400 92px "Noto Serif SC", serif' : '400 92px "Cherry Cream Soda", Georgia, serif';
+    c.fillText(poolText('About Martin', locale), 512, 128, 640);
     texture.needsUpdate = true;
   };
   paintHull();
-  fontsReady().then(paintHull);
+  fontsReady(locale).then(paintHull);
   const printed = track(new THREE.MeshStandardMaterial({ map: texture, roughness: 0.78, side: THREE.DoubleSide }));
 
   for (const s of [1, -1]) {
@@ -279,7 +280,7 @@ function paperBoat(): BuiltObject {
 /* ------------------------------------------------------------- */
 /* Life — a striped swim ring                                       */
 /* ------------------------------------------------------------- */
-function swimRing(): BuiltObject {
+function swimRing(locale: Locale = 'en'): BuiltObject {
   const { canvas, texture, c } = canvasTexture(1024, 256);
   texture.wrapS = THREE.RepeatWrapping;
   const paint = () => {
@@ -294,16 +295,16 @@ function swimRing(): BuiltObject {
     c.fillStyle = '#c93a24';
     c.textAlign = 'center';
     c.textBaseline = 'middle';
-    c.font = '400 58px "Cherry Cream Soda", Georgia, serif';
+    c.font = locale === 'zh' ? '400 58px "Noto Serif SC", serif' : '400 58px "Cherry Cream Soda", Georgia, serif';
     c.save();
     c.translate(1.5 * w, canvas.height * 0.25);
     c.rotate(Math.PI);
-    c.fillText('Life', 0, 0);
+    c.fillText(poolText('Life', locale), 0, 0);
     c.restore();
     texture.needsUpdate = true;
   };
   paint();
-  fontsReady().then(paint);
+  fontsReady(locale).then(paint);
   const R = 0.122;
   const r = 0.056;
   const tube = mesh(track(new THREE.TorusGeometry(R, r, 28, 96)), vinyl('#ffffff', 0.24, { map: texture, clearcoat: 1, clearcoatRoughness: 0.12 }), 0, 0.016, 0);
@@ -543,12 +544,12 @@ function toyTurtle(): BuiltObject {
   };
 }
 
-export const builders: Record<PoolObjectId, () => BuiltObject> = {
-  'adapt-to-china': () => brandFloat('adapt-to-china'),
-  meetfolio: () => brandFloat('meetfolio'),
-  abtrace: () => brandFloat('abtrace'),
-  'supplier-document-intelligence': () => brandFloat('document-ai'),
-  fanscope: () => brandFloat('fanscope'),
+export const builders: Record<PoolObjectId, (locale?: Locale) => BuiltObject> = {
+  'adapt-to-china': (locale) => brandFloat('adapt-to-china', locale),
+  meetfolio: (locale) => brandFloat('meetfolio', locale),
+  abtrace: (locale) => brandFloat('abtrace', locale),
+  'supplier-document-intelligence': (locale) => brandFloat('document-ai', locale),
+  fanscope: (locale) => brandFloat('fanscope', locale),
   about: paperBoat,
   life: swimRing,
 };

@@ -14,7 +14,7 @@ Updated 27 October 2026. The approved V6 design and routes remain the baseline.
 ## Still requires Martin’s input
 
 1. Public email confirmed and configured: **adapttochina@163.com**. The Contact page displays the address and every footer links to it. GitHub, LinkedIn and résumé URLs remain hidden until confirmed.
-2. Set the final `site.origin` to enable absolute canonical URLs and the sitemap.
+2. Canonical origin confirmed and configured: **https://martin.adapttochina.com**. English and `/zh/` pages have absolute canonical URLs, language alternates and sitemap entries; the Pages deployment URL remains accessible.
 3. Add an approved résumé PDF if wanted, then set `site.contact.resume`.
 4. Supply watermark-free original medical-guide cover/inside pages, if these should appear. Fields are in `src/data/artifacts.ts`; they remain null/empty. Do not repeat “Checked against official 2026 standards” without evidence.
 5. Confirm the original channels of the two quotations if channel attribution is desired. Permission is already confirmed; it is not being requested again.

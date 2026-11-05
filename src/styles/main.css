@@ -3645,6 +3645,81 @@ a.sc-link:focus-visible { outline: 3px solid var(--aqua); outline-offset: 4px; }
   .pool__bar { padding-top: 8px; }
   .pool .pool__cta { font-size: clamp(12px, calc(var(--fw) * 0.036), 15px); padding: clamp(9px, calc(var(--fw) * 0.026), 11px) clamp(12px, calc(var(--fw) * 0.04), 16px); }
 }
+
+/* Bilingual edition: quiet Song-style Chinese alongside the original lettering. */
+@font-face {
+  font-family: 'Noto Serif SC';
+  src: url('/fonts/noto-serif-sc.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+.language-switch {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  flex-shrink: 0;
+  margin-left: 12px;
+  font: 13px/1.4 var(--font-mono);
+  white-space: nowrap;
+}
+.language-switch a { padding: 8px 5px; min-width: 24px; text-align: center; text-decoration: none; border-radius: 5px; }
+.language-switch a[lang='zh-Hans'] { font-family: 'Noto Serif SC', 'Songti SC', SimSun, serif; }
+.language-switch a[aria-current] { text-decoration: underline; text-underline-offset: 5px; }
+.language-switch span { opacity: .45; }
+.page-home .language-switch { background: rgba(255, 253, 248, .88); border-radius: 999px; padding: 0 5px; }
+.page-life .language-switch { color: #fff; }
+html:lang(zh) {
+  --font-display: 'Noto Serif SC', 'Songti SC', SimSun, serif;
+  --font-body: 'Noto Serif SC', 'Songti SC', SimSun, serif;
+  --font-story: 'Noto Serif SC', 'Songti SC', SimSun, serif;
+  --font-editorial: 'Noto Serif SC', 'Songti SC', SimSun, serif;
+  --font-label: 'Noto Serif SC', 'Songti SC', SimSun, serif;
+  --font-serif: 'Noto Serif SC', 'Songti SC', SimSun, serif;
+}
+html:lang(zh) body { word-spacing: normal; line-height: 1.85; line-break: strict; }
+html:lang(zh) :is(h1, h2, h3, h4) { line-height: 1.4; letter-spacing: .015em; font-variation-settings: normal; }
+html:lang(zh) :is(h1, h2, .card__title) { text-wrap: balance; }
+html:lang(zh) :is(h1 em, h2 em) { font-style: normal; }
+html:lang(zh) .brand__mark, html:lang(zh) .brand__name, html:lang(zh) .pool__floor-type strong { font-family: 'Piedra', Georgia, serif; }
+html:lang(zh) .about-v6__hero h1 { font-size: clamp(42px, 6.2vw, 88px); }
+html:lang(zh) .about-v6__hero h1 em { white-space: nowrap; }
+html:lang(zh) #about-v6-title em { font-family: 'Piedra', Georgia, serif; }
+html:lang(zh) .about-v6__statement { line-height: 1.7; max-width: 26em; }
+html:lang(zh) .about-v6__story-copy { font-size: clamp(16px, 1.3vw, 18px); line-height: 2; }
+html:lang(zh) .about-v6__story-copy p { margin-bottom: 1.5em; }
+html:lang(zh) :is(.sheet__facts dd, .sheet__limits, .atc2__features, .atc2__stages p, .testimonial blockquote) { line-height: 1.85; }
+html:lang(zh) .sheet__oneliner { line-height: 1.7; }
+html:lang(zh) .page-top .lead { max-width: 48em; }
+html:lang(zh) .page-top__question { line-height: 1.6; max-width: 30em; }
+html:lang(zh) .life-hero h1 { font-size: clamp(42px, 7vw, 88px); }
+html:lang(zh) .life-hero__lead { max-width: 30em; line-height: 1.8; }
+html:lang(zh) .contact-block__email { font-family: var(--font-mono); }
+html:lang(zh) .pool__floor-type span { font-size: clamp(17px, 2.4vw, 34px); }
+html:lang(zh) .eyebrow, html:lang(zh) .chip, html:lang(zh) .status, html:lang(zh) .tag { font-family: var(--font-body); letter-spacing: normal; }
+html:lang(zh) .pool__status { max-width: 28em; }
+@media (max-width: 760px) {
+  .language-switch { margin-left: 3px; font-size: 12px; }
+  .language-switch a { padding: 8px 4px; }
+  .site-header__inner { gap: 5px; }
+  html:lang(zh) .about-v6__hero h1 { font-size: clamp(36px, 8vw, 58px); }
+}
+@media (max-width: 560px) {
+  .nav a { padding-inline: 7px; }
+  .language-switch { margin-left: 0; }
+  html:lang(zh) .nav a { font-size: 14px; padding-inline: 8px; }
+}
+@media (max-width: 360px) {
+  .nav a { padding-inline: 4px; font-size: 12px; }
+  .language-switch a { padding-inline: 3px; }
+  html:lang(zh) .nav a { font-size: 13px; padding-inline: 5px; }
+}
 @media (max-aspect-ratio: 5/6) {
   .pool:not(.pool--live) a[href='/life/'] .pool-obj__label { top: -11px; left: calc(var(--r) + 28px); }
+}
+
+/* The static pool shares label placement across both URL prefixes. */
+@media (max-aspect-ratio: 5/6) {
+  .pool:not(.pool--live) a[href$='/about/'] .pool-obj__label { top: -13px; left: calc(var(--r) + 34px); }
+  .pool:not(.pool--live) a[href$='/life/'] .pool-obj__label { top: -11px; left: calc(var(--r) + 28px); }
 }

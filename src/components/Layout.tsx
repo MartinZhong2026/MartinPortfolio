@@ -1,7 +1,9 @@
 import type { ReactNode } from 'react';
 import { nav, site } from '../data/site';
+import { englishPath, localizedPath, type Locale } from '../data/localization';
 
 export interface PageMeta {
+  locale?: Locale;
   path: string;
   title: string;
   description: string;
@@ -17,22 +19,31 @@ export interface Assets {
   preload: string[];
 }
 
-export const INLINE_BOOT = "document.documentElement.classList.add('js')";
+export const INLINE_BOOT = "document.documentElement.classList.add('js');try{if(location.pathname==='/'&&localStorage.getItem('portfolio-language')==='zh'&&!document.referrer.startsWith(location.origin+'/')&&performance.getEntriesByType('navigation').every(e=>e.type!=='back_forward'))location.replace('/zh/'+location.search+location.hash)}catch{}";
 
 export function Document({ meta, assets, children }: { meta: PageMeta; assets: Assets; children: ReactNode }) {
-  const canonical = site.origin ? site.origin + meta.path : undefined;
-  const og = site.origin ? `${site.origin}/og.png` : '/og.png';
+  const locale = meta.locale ?? 'en';
+  const basePath = englishPath(meta.path);
+  const canonical = meta.index === false ? undefined : `${site.origin}${meta.path}`;
+  const og = `${site.origin}/${locale === 'zh' ? 'og-zh.png' : 'og.png'}`;
   return (
-    <html lang="en">
+    <html lang={locale === 'zh' ? 'zh-Hans' : 'en'}>
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
         <title>{meta.title}</title>
         <meta name="description" content={meta.description} />
         {canonical && <link rel="canonical" href={canonical} />}
+        {meta.index !== false && <>
+          <link rel="alternate" hrefLang="en" href={`${site.origin}${basePath}`} />
+          <link rel="alternate" hrefLang="zh-Hans" href={`${site.origin}${localizedPath(basePath, 'zh')}`} />
+          <link rel="alternate" hrefLang="x-default" href={`${site.origin}${basePath}`} />
+        </>}
         {meta.index === false && <meta name="robots" content="noindex" />}
         <meta name="theme-color" content="#f6f2ea" />
         <meta property="og:type" content="website" />
+        <meta property="og:locale" content={locale === 'zh' ? 'zh_CN' : 'en_US'} />
+        <meta property="og:locale:alternate" content={locale === 'zh' ? 'en_US' : 'zh_CN'} />
         <meta property="og:title" content={meta.title} />
         <meta property="og:description" content={meta.description} />
         <meta property="og:image" content={og} />
@@ -52,7 +63,7 @@ export function Document({ meta, assets, children }: { meta: PageMeta; assets: A
         <a className="skip" href="#main">
           Skip to content
         </a>
-        <Header path={meta.path} />
+        <Header path={basePath} locale={locale} />
         <main id="main">{children}</main>
         <Footer />
       </body>
@@ -60,7 +71,7 @@ export function Document({ meta, assets, children }: { meta: PageMeta; assets: A
   );
 }
 
-export function Header({ path }: { path: string }) {
+export function Header({ path, locale = 'en' }: { path: string; locale?: Locale }) {
   return (
     <header className="site-header">
       <div className="wrap site-header__inner">
@@ -76,6 +87,11 @@ export function Header({ path }: { path: string }) {
               {n.label}
             </a>
           ))}
+        </nav>
+        <nav className="language-switch" data-language-switch="" aria-label={locale === 'zh' ? '切换语言' : 'Language'}>
+          <a href={localizedPath(path, 'zh')} hrefLang="zh-Hans" lang="zh-Hans" data-language="zh" aria-current={locale === 'zh' ? 'true' : undefined} aria-label="切换为中文">中文</a>
+          <span aria-hidden="true">/</span>
+          <a href={path} hrefLang="en" lang="en" data-language="en" aria-current={locale === 'en' ? 'true' : undefined} aria-label="Switch to English">EN</a>
         </nav>
       </div>
     </header>

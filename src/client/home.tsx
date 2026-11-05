@@ -1,6 +1,7 @@
 import { hydrateRoot } from 'react-dom/client';
 import { PoolStage } from '../pool/PoolStage';
 import './site';
+import { localeFromPath, localizedPath } from '../data/localization';
 
 // These sections used to live on the homepage; keep old links working.
 const moved: Record<string, string> = {
@@ -10,7 +11,7 @@ const moved: Record<string, string> = {
   '#outside': '/life/',
   '#contact': '/about/#contact',
 };
-if (moved[location.hash]) location.replace(moved[location.hash]);
+if (moved[location.hash]) location.replace(localizedPath(moved[location.hash], localeFromPath(location.pathname)));
 
 const root = document.getElementById('pool-island');
-if (root) hydrateRoot(root, <PoolStage />);
+if (root) hydrateRoot(root, <PoolStage locale={localeFromPath(location.pathname)} />);

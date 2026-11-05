@@ -26,6 +26,12 @@ There is no client-side router: links are full page loads. Same-origin cross-fad
 
 ## Components and data
 
+The English route table is mirrored under `/zh/` at build time. The two languages
+share page templates and assets; a strict build-only text catalog localizes the
+Chinese HTML, while the hydrated pool receives an explicit locale and a small
+shared catalog. See [LOCALIZATION.md](LOCALIZATION.md) for content boundaries,
+URLs, saved preferences, Chinese fonts, metadata and bilingual QA.
+
 - `src/components/Layout.tsx` renders the full document, header, footer and skip link. The primary nav comes from `nav` in `src/data/site.ts`.
 - `src/pages/pages.tsx` holds the top-level pages. About is composed of `AboutHero`, `AboutProof`, `AboutStory`, `AboutStrengths` and `AboutClosing`.
 - **About story.** `AboutStory` is a two-column spread: a collage of real images (`storyCollage` in `about.ts`) beside the essay. The essay is Martin's approved copy, its paragraphs set in Boogaloo, kept in `scripts/fixtures/about-story.md` and turned into `src/data/story.ts` by `scripts/gen-story.mjs`, so the page cannot drift from it. The collage grows downwards: each image takes its own row, alternates left and right, and tucks under the one above, so appending an entry to `storyCollage` reflows it without CSS changes. `tuck` raises an image into the space beside the one above. `kind` (`browser`, `phone`, `photo`, `logo`) sets its frame and width. On phones it stacks above the essay.
@@ -141,7 +147,10 @@ One `light` direction is used by caustics, shadows, the directional light and a 
 
 These are Cloudflare Pages file formats. The intended project settings are build command `npm run build`, output directory `dist`, Node 20.10 or newer. This repository holds no Cloudflare configuration, so check those settings in the Cloudflare dashboard. `scripts/serve.mjs` mimics the same routing locally, but it does not apply `_headers`.
 
-Before launch, set `site.origin` in `src/data/site.ts` to enable canonical URLs and the sitemap. See `CONTENT_TODO.md`.
+`site.origin` in `src/data/site.ts` is the confirmed canonical origin,
+`https://martin.adapttochina.com`. The build emits absolute canonical URLs,
+reciprocal language alternates and the bilingual sitemap. See `CONTENT_TODO.md`
+for the remaining launch checklist.
 
 ## Tests
 

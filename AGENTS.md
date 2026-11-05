@@ -83,6 +83,16 @@ Special Elite has one weight, a wide set and a strong texture. Keep it at 13px o
 
 Responsive rules: design from 320px up; `max-aspect-ratio: 5/6` switches the pool to portrait; Home must fit one screen with no scrolling at common sizes.
 
+## Localization
+
+- English keeps its existing URLs; Simplified Chinese mirrors them under `/zh/`.
+- Keep approved English copy and `scripts/fixtures/about-story.md` unchanged. Write Chinese naturally, preserve facts and prototype limits, and label translated testimonials as translations.
+- Chinese copy lives in `src/data/locales/zh-CN.json`; the hydrated pool uses the smaller `pool.zh-CN.json`. The build rejects missing translations. Never add silent English fallbacks.
+- Translate visible text, image descriptions, accessible names and metadata together. Proper names and technical terms may remain in English when explicitly reviewed in the catalogs.
+- URLs select the language. Only an explicit switch saves a preference; never infer it from the browser language. Keep query strings, anchors and Back/Forward working.
+- Use the self-hosted Noto Serif SC subset for Chinese. Regenerate it after adding characters (see its source note under `public/fonts/licenses/`). Keep the pool shaders and composition unchanged.
+- Run `npm run test:localization`, `npm run test:about`, `node scripts/mobile-layout.mjs --zh`, and captures in both languages for localization changes. See `docs/LOCALIZATION.md` for architecture and review procedure.
+
 ## The pool
 
 Read the Pool section of [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) before changing anything in `src/pool/`. Constraints that are easy to break:

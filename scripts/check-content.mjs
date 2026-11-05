@@ -6,7 +6,8 @@ import { dist, root } from './lib.mjs';
 
 const slugs = ['adapt-to-china', 'meetfolio', 'abtrace', 'supplier-document-intelligence', 'fanscope'];
 const allPages = ['index.html', 'work/index.html', 'about/index.html', 'life/index.html', '404.html', ...slugs.map((s) => `work/${s}/index.html`)];
-for (const route of allPages) {
+const allPublicPages = [...allPages, ...allPages.map(file => `zh/${file}`)];
+for (const route of allPublicPages) {
   const html = await readFile(join(dist, route), 'utf8');
   assert.match(html, /<html\b/i, `Missing HTML element: ${route}`);
   assert.match(html, /<title>/i, `Missing document title: ${route}`);
@@ -30,7 +31,7 @@ for (const [font, license] of [['piedra.woff2', 'Piedra-OFL.txt'], ['cherry-crea
 const atc = await readFile(join(dist, 'work/adapt-to-china/index.html'), 'utf8');
 assert(atc.length > 3000, 'Flagship case study seems incomplete');
 await stat(join(dist, 'favicon.svg'));
-console.log(`✓ ${allPages.length} static HTML routes, all five project links, favicon and flagship content checked`);
+console.log(`✓ ${allPublicPages.length} static HTML routes, all five project links, favicon and flagship content checked`);
 
 // Source-backed checks: only explicitly consented, verbatim excerpts can render.
 const { build } = await import('esbuild');
@@ -55,7 +56,7 @@ try {
   console.log('✓ Two authorized verbatim testimonials; revoked consent renders nothing');
 } finally { await rm(checkModule, { force: true }); }
 
-for (const route of allPages) {
+for (const route of allPublicPages) {
   const html = await readFile(join(dist, route), 'utf8');
   assert(!/TODO\(Martin\)|\[VERIFY\]/.test(html), `Editorial marker leaked: ${route}`);
   assert(!/CCTV|government (?:internship|project)/i.test(html), 'Excluded experience appeared');
@@ -83,7 +84,7 @@ const renderedParagraphs = [...storyHtml.matchAll(/<p>([\s\S]*?)<\/p>/g)].map((m
 assert.deepEqual(renderedParagraphs, approved.slice(2), 'Story paragraphs differ from the approved copy');
 console.log(`✓ About story matches the approved copy exactly (${renderedParagraphs.length} paragraphs)`);
 assert(!/about-v6__path|Education and career timeline/.test(about), 'Career timeline is still on About');
-for (const route of allPages) {
+for (const route of allPublicPages) {
   const html = await readFile(join(dist, route), 'utf8');
   assert(!/YBBE|Mintel|Career International|interns?|internships?|employer/i.test(html), `Employer or internship reference on ${route}`);
 }
@@ -112,7 +113,7 @@ for (const html of [about]) {
 assert(about.includes('mailto:adapttochina@163.com'), 'Confirmed public email missing');
 assert(about.includes('>adapttochina@163.com</a>'), 'Public email address not visible on About');
 assert(!(await stat(join(dist, 'contact/index.html')).then(() => true, () => false)), 'Standalone Contact page should not exist');
-for (const route of allPages) {
+for (const route of allPublicPages) {
   const html = await readFile(join(dist, route), 'utf8');
   assert(!html.includes('martinzhong@mail.sjtu.edu.cn'), 'Unconfirmed candidate email rendered');
   for (const match of html.matchAll(/href="mailto:([^"]+)"/g)) {
