@@ -1,3 +1,4 @@
+import { poolText, type Locale } from '../data/localization';
 import * as THREE from 'three';
 import {
   blurFrag,
@@ -28,6 +29,7 @@ export interface Anchor {
 }
 
 export interface EngineOptions {
+  locale: Locale;
   reducedMotion: boolean;
   coarse: boolean;
   /** diagnostic switches from `?poolfx=`; see capability.ts */
@@ -259,13 +261,13 @@ export class PoolEngine {
       ink.fillStyle = '#fff';
       ink.font = '400 190px "Piedra", Georgia, serif';
       ink.fillText('Martin Zhong', 768, 440, 1000);
-      ink.font = '400 80px "Geo", ui-monospace, monospace';
-      ink.fillText('welcome to my world', 768, 588, 820);
+      ink.font = opts.locale === 'zh' ? '400 70px "Noto Serif SC", serif' : '400 80px "Geo", ui-monospace, monospace';
+      ink.fillText(poolText('welcome to my world', opts.locale), 768, 588, 820);
       if (this.floorTypeTex) this.floorTypeTex.needsUpdate = true;
     };
     paintLettering();
     this.floorTypeTex = new THREE.CanvasTexture(lettering);
-    Promise.all([document.fonts?.load('400 192px "Piedra"'), document.fonts?.load('400 76px "Geo"')]).then(paintLettering).catch(() => undefined);
+    Promise.all([document.fonts?.load('400 192px "Piedra"'), document.fonts?.load(opts.locale === 'zh' ? '400 70px "Noto Serif SC"' : '400 76px "Geo"')]).then(paintLettering).catch(() => undefined);
     this.floorTypeTex.generateMipmaps = true;
     this.floorTypeTex.minFilter = THREE.LinearMipmapLinearFilter;
     this.floorTypeTex.magFilter = THREE.LinearFilter;
@@ -435,7 +437,7 @@ export class PoolEngine {
         diving: false,
       });
     };
-    opts.ids.forEach((id) => addFloat(id, builders[id](), { landscape: landscapeLayout[id], portrait: portraitLayout[id] }));
+    opts.ids.forEach((id) => addFloat(id, builders[id](opts.locale), { landscape: landscapeLayout[id], portrait: portraitLayout[id] }));
     toyBuilders.forEach((build, i) => addFloat(null, build(), toySlots[i]));
 
     this.floatShadows = new FloatShadows(this.renderer, this.objects.map(o => o.built.group), this.shared.halfSize.value, D, light, opts.coarse);

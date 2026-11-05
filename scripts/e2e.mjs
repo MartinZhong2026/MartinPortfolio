@@ -186,7 +186,8 @@ try {
   const narrow=await browser.newContext({viewport:{width:320,height:568},isMobile:true,hasTouch:true});
   const np=await narrow.newPage(); await np.goto(`${origin}/?pool=static`,{waitUntil:'networkidle'});
   assert(await np.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'Horizontal overflow at 320px');
-  assert.equal(await np.locator('.site-header nav a').count(),4);
+  assert.equal(await np.locator('.site-header .nav a').count(),4);
+  assert.equal(await np.locator('.language-switch a').count(),2);
   for(const path of ['about','work','life',...slugs.map(s=>`work/${s}`)]) {
     await np.goto(`${origin}/${path}/`,{waitUntil:'networkidle'});
     await np.evaluate(()=>document.fonts.ready);

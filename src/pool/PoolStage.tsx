@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type CSSProperties, type MouseEvent } from 'react';
+import { localizedPath, poolText, type Locale } from '../data/localization';
 import { projects } from '../data/projects';
 import { Glyph } from '../components/Glyph';
 import { landscapeLayout, portraitLayout, type PoolObjectId } from './layout';
@@ -35,7 +36,9 @@ export const poolItems: PoolItem[] = [
  * The homepage pool. Server-rendered as an accessible, illustrated static pool
  * (works without JavaScript or WebGL) and hydrated into the live WebGL scene.
  */
-export function PoolStage() {
+export function PoolStage({ locale = 'en' }: { locale?: Locale }) {
+  const t = (text: string) => poolText(text, locale);
+  const items = poolItems.map(item => ({ ...item, href: localizedPath(item.href, locale), label: t(item.label), caption: t(item.caption), status: item.status ? t(item.status) : undefined }));
   const [mode, setMode] = useState<Mode>('static');
   const [active, setActive] = useState<PoolObjectId | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -65,6 +68,7 @@ export function PoolStage() {
         if (cancelled || !canvasRef.current || !frameRef.current) return;
         const frame = frameRef.current;
         engine = new PoolEngine(canvasRef.current, frame, {
+          locale,
           reducedMotion: prefersReducedMotion(),
           coarse: isCoarsePointer(),
           fx: poolFx(),
@@ -167,7 +171,7 @@ export function PoolStage() {
       engineRef.current = null;
     };
     // `generation` lets a lost context rebuild the engine.
-  }, [generation]);
+  }, [generation, locale]);
 
   // Rebuild after a restored WebGL context.
   useEffect(() => {
@@ -180,7 +184,7 @@ export function PoolStage() {
 
   const go = async (id: PoolObjectId) => {
     if (navigating.current) return;
-    const item = poolItems.find((i) => i.id === id);
+    const item = items.find((i) => i.id === id);
     if (!item) return;
     navigating.current = true;
     const engine = engineRef.current;
@@ -220,18 +224,18 @@ export function PoolStage() {
         <div className="pool__frame" ref={frameRef}>
           <div className="pool__static" aria-hidden="true">
             <div className="pool__static-water" />
-            <div className="pool__floor-type" aria-label="Martin Zhong — welcome to my world">
-              <strong>Martin Zhong</strong><span>welcome to my world</span>
+            <div className="pool__floor-type" aria-label={t("Martin Zhong — welcome to my world")}>
+              <strong>Martin Zhong</strong><span>{t("welcome to my world")}</span>
             </div>
           </div>
-          <h1 className="sr-only">Martin Zhong — welcome to my world</h1>
+          <h1 className="sr-only">{t("Martin Zhong — welcome to my world")}</h1>
           <div className="pool__cta-anchor" ref={ctaRef}>
-            <a className="pool__cta" href="/work/">
-              Dive into my world <span aria-hidden="true">→</span>
+            <a className="pool__cta" href={localizedPath('/work/', locale)}>
+              {t('Dive into my world')} <span aria-hidden="true">→</span>
             </a>
           </div>
-          <ul className="pool__objects" aria-label="Projects and pages floating in the pool">
-            {poolItems.map((item) => {
+          <ul className="pool__objects" aria-label={t("Projects and pages floating in the pool")}>
+            {items.map((item) => {
               const l = landscapeLayout[item.id];
               const p = portraitLayout[item.id];
               const style = {
@@ -270,13 +274,13 @@ export function PoolStage() {
         </div>
         <div className="pool__bar">
           <p className="pool__hint">
-            <span className="hint-fine">Click a floating object to explore.</span>
-            <span className="hint-coarse">Tap a floating object to explore.</span>
+            <span className="hint-fine">{t("Click a floating object to explore.")}</span>
+            <span className="hint-coarse">{t("Tap a floating object to explore.")}</span>
           </p>
           <p className="pool__status" role="status" aria-live="polite">
-            {mode === 'loading' && 'Getting the pool ready…'}
+            {mode === 'loading' && t('Getting the pool ready…')}
             {mode === 'unsupported' &&
-              "The interactive pool isn't available on this device. Every project is still one tap away."}
+              t("The interactive pool isn't available on this device. Every project is still one tap away.")}
           </p>
         </div>
       </div>

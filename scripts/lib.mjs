@@ -85,7 +85,7 @@ export async function buildSite({ dev = false, log = true } = {}) {
       css: cssFile,
       scripts: [scripts[route.entry]],
       // The pool letters its floor with Piedra and Geo before first paint.
-      preload: route.entry === 'home' ? ['/fonts/piedra.woff2', '/fonts/geo.woff2'] : ['/fonts/special-elite.woff2', '/fonts/piedra.woff2'],
+      preload: route.meta.locale === 'zh' ? ['/fonts/noto-serif-sc.woff2', ...(route.entry === 'home' ? ['/fonts/piedra.woff2'] : [])] : route.entry === 'home' ? ['/fonts/piedra.woff2', '/fonts/geo.woff2'] : ['/fonts/special-elite.woff2', '/fonts/piedra.woff2'],
     });
     if (dev) html = html.replace('</body>', `<script>${LIVE_RELOAD}</script></body>`);
     const file = join(dist, route.file);
@@ -97,7 +97,7 @@ export async function buildSite({ dev = false, log = true } = {}) {
   await cp(join(root, 'public'), dist, { recursive: true });
 
   // 6) Cloudflare Pages headers (CSP allows only our own inline boot snippet)
-  const boot = "document.documentElement.classList.add('js')";
+  const boot = mod.INLINE_BOOT;
   const hash = createHash('sha256').update(boot).digest('base64');
   const headers = `/*
   X-Content-Type-Options: nosniff
@@ -113,13 +113,17 @@ export async function buildSite({ dev = false, log = true } = {}) {
   await writeFile(join(dist, '_headers'), headers);
   let robots = 'User-agent: *\nAllow: /\n';
   if (site.origin) {
-    const urls = routes.filter((r) => r.meta.index !== false).map((r) => `  <url><loc>${site.origin}${r.meta.path}</loc></url>`);
-    await writeFile(join(dist, 'sitemap.xml'), `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.join('\n')}\n</urlset>\n`);
+    const urls = routes.filter((r) => r.meta.index !== false).map((r) => {
+      const path = r.meta.path.replace(/^\/zh(?=\/)/, '');
+      const alternates = [['en', path], ['zh-Hans', `/zh${path}`], ['x-default', path]];
+      return `  <url><loc>${site.origin}${r.meta.path}</loc>${alternates.map(([lang, href]) => `<xhtml:link rel="alternate" hreflang="${lang}" href="${site.origin}${href}"/>`).join('')}</url>`;
+    });
+    await writeFile(join(dist, 'sitemap.xml'), `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">\n${urls.join('\n')}\n</urlset>\n`);
     robots += `Sitemap: ${site.origin}/sitemap.xml\n`;
   }
   await writeFile(join(dist, 'robots.txt'), robots);
   // The standalone Contact page was merged into About (V9).
-  await writeFile(join(dist, '_redirects'), '/contact /about/#contact 301\n/contact/ /about/#contact 301\n');
+  await writeFile(join(dist, '_redirects'), '/contact /about/#contact 301\n/contact/ /about/#contact 301\n/zh/contact /zh/about/#contact 301\n/zh/contact/ /zh/about/#contact 301\n');
 
   await rm(tmp, { recursive: true, force: true });
   if (log) console.log(`✓ built ${routes.length} pages in ${Math.round(performance.now() - t0)} ms → dist/`);

@@ -14,7 +14,7 @@ try {
     const page = await browser.newPage({ viewport, reducedMotion: 'reduce' });
     const errors = [];
     page.on('pageerror', error => errors.push(error.message));
-    for (const route of ['/about/']) {
+    for (const route of ['/about/', '/zh/about/']) {
       await page.goto(origin + route, { waitUntil: 'networkidle' });
       const hero = page.locator('.about-v6__hero');
       await hero.scrollIntoViewIfNeeded();
@@ -37,7 +37,7 @@ try {
       assert(!layout.overflow, `Horizontal overflow: ${route} ${viewport.width}`);
       assert.equal(await hero.locator('img').count(), 1);
       assert.equal(await hero.locator('.about-v6__education-entry').count(), 2);
-      for (const text of ['First Prize Scholarship', 'Second Prize Scholarship']) assert(await hero.getByText(text, { exact: true }).isVisible());
+      for (const text of route.startsWith('/zh/') ? ['一等奖学金', '二等奖学金'] : ['First Prize Scholarship', 'Second Prize Scholarship']) assert(await hero.getByText(text, { exact: true }).isVisible());
       if (viewport.width <= 800) {
         const ordered = ['heading', 'portrait', 'statement', 'education', 'actions', 'keywords'];
         for (let i = 1; i < ordered.length; i++) assert(layout[ordered[i]].y >= layout[ordered[i - 1]].bottom - 1, `Reading order: ${ordered[i]} at ${route} ${viewport.width}`);
@@ -49,13 +49,13 @@ try {
         assert(layout.portrait.x > layout.heading.right, 'Desktop portrait belongs in right column');
         assert(layout.statement.x < layout.portrait.x, 'Desktop introduction belongs in left column');
       }
-      const name = 'about';
+      const name = route.startsWith('/zh/') ? 'about-zh' : 'about';
       await hero.evaluate(el => window.scrollTo(0, el.offsetTop));
       await page.screenshot({ path: `test-results/about-refresh/${name}-${viewport.width}-viewport.png` });
       await hero.screenshot({ path: `test-results/about-refresh/${name}-${viewport.width}-hero.png` });
       // Reveal the whole page before taking a full-page record.
       for (const section of await page.locator('[data-reveal]').all()) await section.scrollIntoViewIfNeeded();
-      await page.screenshot({ path: `test-results/about-refresh/about-${viewport.width}-full.png`, fullPage: true });
+      await page.screenshot({ path: `test-results/about-refresh/${name}-${viewport.width}-full.png`, fullPage: true });
       results.push({ route, viewport, layout });
     }
     assert.deepEqual(errors, [], `Browser errors at ${viewport.width}`);

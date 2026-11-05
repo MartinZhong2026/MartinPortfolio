@@ -14,7 +14,10 @@ import { SupplierDocAI } from '../pages/cases/SupplierDocAI';
 import { FanScope } from '../pages/cases/FanScope';
 import { PoolStage } from '../pool/PoolStage';
 import { projectBySlug, projects, type ProjectSlug } from '../data/projects';
+import { localizeHtml } from './localize';
+import { localizedPath, type Locale } from '../data/localization';
 export { site } from '../data/site';
+export { INLINE_BOOT } from '../components/Layout';
 
 export interface Route {
   meta: PageMeta;
@@ -22,7 +25,7 @@ export interface Route {
   file: string;
   /** which client entry the page needs */
   entry: 'home' | 'site';
-  render: () => ReactElement;
+  render: (locale: Locale) => ReactElement;
 }
 
 const caseComponents: Record<ProjectSlug, () => ReactElement> = {
@@ -33,7 +36,7 @@ const caseComponents: Record<ProjectSlug, () => ReactElement> = {
   fanscope: FanScope,
 };
 
-export const routes: Route[] = [
+const englishRoutes: Route[] = [
   {
     meta: {
       path: '/',
@@ -44,7 +47,7 @@ export const routes: Route[] = [
     },
     file: 'index.html',
     entry: 'home',
-    render: () => <Home islandHtml={renderToString(<PoolStage />)} />,
+    render: (locale) => <Home islandHtml={renderToString(<PoolStage locale={locale} />)} />,
   },
   {
     meta: {
@@ -103,6 +106,14 @@ export const routes: Route[] = [
   },
 ];
 
+export const routes: Route[] = [...englishRoutes, ...englishRoutes.map(route => ({
+  ...route,
+  meta: { ...route.meta, path: localizedPath(route.meta.path, 'zh'), locale: 'zh' as const },
+  file: `zh/${route.file}`,
+}))];
+
 export function renderRoute(route: Route, assets: Assets): string {
-  return '<!doctype html>' + renderToStaticMarkup(<Document meta={route.meta} assets={assets}>{route.render()}</Document>);
+  const locale = route.meta.locale ?? 'en';
+  const html = '<!doctype html>' + renderToStaticMarkup(<Document meta={route.meta} assets={assets}>{route.render(locale)}</Document>);
+  return locale === 'zh' ? localizeHtml(html) : html;
 }

@@ -35,16 +35,23 @@ export function startServer({ port = 4321, host = '127.0.0.1', onRequest } = {})
       if (onRequest && onRequest(req, res)) return;
       const url = new URL(req.url, 'http://x');
       let path = decodeURIComponent(url.pathname);
+      if (/^\/(zh\/)?contact\/?$/.test(path)) {
+        res.writeHead(301, { Location: `${path.startsWith('/zh/') ? '/zh' : ''}/about/${url.search}#contact` });
+        return res.end();
+      }
       const safe = normalize(path).replace(/^[/\\]+/, '').replace(/^(\.\.[/\\])+/, '');
       let file = join(dist, safe);
       if (!extname(safe) && !path.endsWith('/') && (await exists(join(file, 'index.html')))) {
         res.writeHead(301, { Location: path + '/' + url.search });
         return res.end();
       }
-      if (path.endsWith('/') || !extname(safe)) file = join(file, 'index.html');
+      if (path.endsWith('/') || !extname(safe)) {
+        const cleanHtml = file + '.html';
+        file = !path.endsWith('/') && await exists(cleanHtml) ? cleanHtml : join(file, 'index.html');
+      }
       let status = 200;
       if (!(await exists(file))) {
-        file = join(dist, '404.html');
+        file = join(dist, path.startsWith('/zh/') ? 'zh/404.html' : '404.html');
         status = 404;
       }
       const body = await readFile(file);

@@ -12,7 +12,7 @@ export const site = {
   intro:
     'I turn real-world problems into working products, from early discovery to prototypes, software, and real users.',
   /** Set to the production origin (no trailing slash) before deploying, e.g. 'https://martinzhong.com'. */
-  origin: '',
+  origin: 'https://martin.adapttochina.com',
   contact: {
     email: 'adapttochina@163.com' as string | null, // Public contact confirmed by Martin, 27 October 2026.
     github: null as string | null, // [VERIFY ACTIVE PROFILE URL]
